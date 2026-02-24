@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"github.com/lucheng0127/courier/internal/model"
 	"gorm.io/gorm"
 )
@@ -13,6 +15,7 @@ type APIKeyRepository interface {
 	FindByKey(key string) (*model.APIKey, error)
 	Delete(id uint) error
 	UpdateStatus(id uint, status string) error
+	UpdateLastUsedAt(id uint, lastUsedAt time.Time) error
 }
 
 // apiKeyRepository API Key 仓储实现
@@ -59,4 +62,8 @@ func (r *apiKeyRepository) Delete(id uint) error {
 
 func (r *apiKeyRepository) UpdateStatus(id uint, status string) error {
 	return r.db.Model(&model.APIKey{}).Where("id = ?", id).Update("status", status).Error
+}
+
+func (r *apiKeyRepository) UpdateLastUsedAt(id uint, lastUsedAt time.Time) error {
+	return r.db.Model(&model.APIKey{}).Where("id = ?", id).Update("last_used_at", lastUsedAt).Error
 }

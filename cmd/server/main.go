@@ -11,7 +11,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/lucheng0127/courier/internal/client"
 	"github.com/lucheng0127/courier/internal/handler"
+	"github.com/lucheng0127/courier/internal/middleware"
 	"github.com/lucheng0127/courier/internal/repository"
 	"github.com/lucheng0127/courier/internal/router"
 	"github.com/lucheng0127/courier/internal/service"
@@ -49,17 +51,30 @@ func main() {
 	// 初始化仓储
 	userRepo := repository.NewUserRepository(db)
 	apiKeyRepo := repository.NewAPIKeyRepository(db)
+	requestLogRepo := repository.NewRequestLogRepository(db)
 
 	// 初始化服务
 	userService := service.NewUserService(userRepo)
 	apiKeyService := service.NewAPIKeyService(userRepo, apiKeyRepo)
+	modelService := service.NewModelService(cfg.Models)
+
+	// 初始化模型客户端（30秒超时）
+	modelClient := client.NewModelClient(30 * time.Second)
+
+	// 初始化聊天服务
+	chatService := service.NewChatService(modelService, modelClient, requestLogRepo)
 
 	// 初始化处理器
 	userHandler := handler.NewUserHandler(userService)
 	apiKeyHandler := handler.NewAPIKeyHandler(apiKeyService)
+	modelHandler := handler.NewModelHandler(modelService)
+	chatHandler := handler.NewChatHandler(chatService)
+
+	// 初始化中间件
+	authMiddleware := middleware.NewAuthMiddleware(apiKeyRepo, userRepo)
 
 	// 设置路由
-	r := router.SetupRouter(userHandler, apiKeyHandler)
+	r := router.SetupRouter(userHandler, apiKeyHandler, modelHandler, chatHandler, authMiddleware)
 
 	// 启动 HTTP 服务器
 	addr := ":" + cfg.Server.Port
