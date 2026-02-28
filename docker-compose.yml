@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: courier-postgres
+    environment:
+      POSTGRES_DB: courier
+      POSTGRES_USER: courier
+      POSTGRES_PASSWORD: courier
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U courier"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  courier:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: courier-api
+    environment:
+      DATABASE_URL: host=postgres port=5432 user=courier password=courier dbname=courier sslmode=disable
+      PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["/app/server", "migrate", "up"]
+
+volumes:
+  postgres_data:
