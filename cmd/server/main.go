@@ -46,6 +46,7 @@ func main() {
 
 	// 初始化 Service
 	providerSvc := service.NewProviderService(providerRepo)
+	routerSvc := service.NewRouterService()
 
 	// 初始化 Providers（导入 Adapter 包触发 init 注册）
 	ctx := context.Background()
@@ -56,6 +57,7 @@ func main() {
 	// 启动 HTTP 服务器
 	router := gin.Default()
 	api := router.Group("/api/v1")
+	v1 := router.Group("/v1")
 
 	// Provider 管理 API
 	providerCtrl := controller.NewProviderController(providerSvc)
@@ -66,6 +68,12 @@ func main() {
 	adminGroup := api.Group("")
 	adminGroup.Use(middleware.AdminAuth())
 	reloadCtrl.RegisterRoutes(adminGroup)
+
+	// Chat Completions API（需要 API Key 鉴权）
+	chatCtrl := controller.NewChatController(routerSvc)
+	chatGroup := v1.Group("")
+	chatGroup.Use(middleware.APIKeyAuth())
+	chatGroup.POST("/chat/completions", chatCtrl.ChatCompletions)
 
 	// 启动服务器
 	addr := ":8080"
