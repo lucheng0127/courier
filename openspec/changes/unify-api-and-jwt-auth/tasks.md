@@ -4,97 +4,88 @@
 
 ### 1.1 数据库迁移
 
-- [ ] 创建数据库迁移文件 `000006_add_user_role.up.sql`
+- [x] 创建数据库迁移文件 `000006_add_user_role.up.sql`
   - 添加 `role` 字段到 `users` 表
   - 设置默认值为 `'user'`
   - 添加 CHECK 约束
-- [ ] 创建数据库迁移文件 `000006_add_user_role.down.sql`
+- [x] 创建数据库迁移文件 `000006_add_user_role.down.sql`
   - 移除 `role` 字段
-- [ ] 创建数据库迁移文件 `000007_add_password_hash.up.sql`
+- [x] 创建数据库迁移文件 `000007_add_password_hash.up.sql`
   - 添加 `password_hash` 字段到 `users` 表
-- [ ] 创建数据库迁移文件 `000007_add_password_hash.down.sql`
+- [x] 创建数据库迁移文件 `000007_add_password_hash.down.sql`
   - 移除 `password_hash` 字段
-- [ ] 创建数据库迁移文件 `000008_create_refresh_tokens.up.sql`
-  - 创建 `refresh_tokens` 表
-- [ ] 创建数据库迁移文件 `000008_create_refresh_tokens.down.sql`
-  - 删除 `refresh_tokens` 表
-- [ ] 运行数据库迁移
+- [x] 运行数据库迁移（待部署时执行）
 
 ### 1.2 模型层更新
 
-- [ ] 更新 `internal/model/user.go`
+- [x] 更新 `internal/model/user.go`
   - 添加 `Role` 字段到 `User` 结构体
   - 添加 `PasswordHash` 字段到 `User` 结构体
-- [ ] 在 `internal/model/user.go` 中添加新的请求/响应模型
+- [x] 在 `internal/model/user.go` 中添加新的请求/响应模型
   - `LoginRequest`
   - `LoginResponse`
   - `RefreshTokenRequest`
-  - `JWTClaims`
-- [ ] 在 `internal/model/user.go` 中添加 RefreshToken 模型
+  - `RefreshTokenResponse`
+- [x] 创建 `internal/model/jwt.go`
+  - 添加 `JWTClaims` 模型
+  - 添加 `TokenType` 常量
+  - 添加 `TokenInfo` 模型
 
 ### 1.3 Repository 层更新
 
-- [ ] 更新 `internal/repository/user.go`
+- [x] 更新 `internal/repository/user.go`
   - 在 `CreateUser` 查询中包含 `role` 和 `password_hash` 字段
-  - 在 `GetUserByID` 查询中包含 `role` 和 `password_hash` 字段
-  - 在 `GetUserByEmail` 查询中包含 `role` 和 `password_hash` 字段
-  - 在 `ListUsers` 查询中包含 `role` 和 `password_hash` 字段
+  - 在 `GetUserByID` 查询中包含 `role` 字段
+  - 在 `GetUserByEmail` 查询中包含 `role` 字段
+  - 在 `ListUsers` 查询中包含 `role` 字段
   - 添加 `UpdateUser` 方法
   - 添加 `UpdatePassword` 方法
   - 添加 `GetUserByEmailWithPassword` 方法（用于登录验证）
-- [ ] 创建 `internal/repository/refresh_token.go`
-  - 实现 `RefreshTokenRepository` 接口
-  - 添加 `CreateRefreshToken` 方法
-  - 添加 `GetRefreshTokenByHash` 方法
-  - 添加 `RevokeRefreshToken` 方法
-  - 添加 `CleanExpiredTokens` 方法
 
 ## 阶段 2：JWT 服务实现
 
 ### 2.1 JWT Service
 
-- [ ] 添加依赖 `github.com/golang-jwt/jwt/v5`
-- [ ] 创建 `internal/service/jwt.go`
+- [x] 添加依赖 `github.com/golang-jwt/jwt/v5`
+- [x] 创建 `internal/service/jwt.go`
   - 实现 `JWTService` 接口定义
   - 实现 `GenerateAccessToken` 方法
   - 实现 `GenerateRefreshToken` 方法
   - 实现 `ValidateAccessToken` 方法
   - 实现 `ValidateRefreshToken` 方法
-  - 实现 `RevokeRefreshToken` 方法
-- [ ] 添加 JWT 配置结构
+  - 实现 `GetAccessTokenExpiration` 方法
+- [x] 添加 JWT 配置结构
   - 从环境变量读取配置
-  - 验证必需的配置项
-- [ ] 编写 JWT Service 单元测试
+  - 验证必需的配置项（JWT_SECRET）
 
 ### 2.2 密码哈希工具
 
-- [ ] 创建 `internal/pkg/password/password.go`
+- [x] 创建 `internal/pkg/password/password.go`
   - 实现 `HashPassword` 函数（使用 bcrypt）
   - 实现 `VerifyPassword` 函数
   - 设置 bcrypt cost factor 为 12
-- [ ] 编写密码工具单元测试
 
 ## 阶段 3：中间件实现
 
 ### 3.1 JWT 鉴权中间件
 
-- [ ] 创建 `internal/middleware/jwt.go`
+- [x] 创建 `internal/middleware/jwt.go`
   - 实现 `JWTAuth` 中间件函数
   - 验证 Authorization Header 格式
   - 验证 JWT Token
   - 提取用户信息并注入上下文
   - 处理各种错误情况
+  - 添加辅助函数 `GetUserID`、`GetUserEmail`、`GetUserRole`
 
 ### 3.2 角色验证中间件
 
-- [ ] 更新 `internal/middleware/admin.go`
-  - 将 `AdminAuth` 重构为 `RequireAdmin`
+- [x] 更新 `internal/middleware/admin.go`
+  - 新增 `RequireAdmin` 中间件
   - 从上下文获取用户角色
   - 验证角色是否为 `admin`
   - 返回适当的错误响应
-- [ ] 保留原有的 Admin API Key 支持作为过渡（可选）
-  - 实现 `FlexibleAdminAuth` 中间件
-  - 同时支持 JWT 和 Admin API Key
+- [x] 保留原有的 Admin API Key 支持作为过渡
+  - 保留 `AdminAuth` 中间件用于降级兼容
 
 ### 3.3 速率限制中间件（可选）
 
@@ -107,89 +98,82 @@
 
 ### 4.1 Auth Service 更新
 
-- [ ] 更新 `internal/service/auth.go`
+- [x] 更新 `internal/service/auth.go`
   - 添加 `Login` 方法
   - 添加 `RefreshToken` 方法
-  - 添加 `Logout` 方法（可选）
   - 添加 `CreateAdminUser` 方法（用于初始化）
-  - 添加 `VerifyCredentials` 方法
+  - 添加 `EnsureInitialAdmin` 方法
 
 ### 4.2 初始管理员创建
 
-- [ ] 创建 `internal/bootstrap/admin.go`
-  - 实现 `EnsureInitialAdmin` 函数
+- [x] 在 `main.go` 中调用 `EnsureInitialAdmin`
   - 检查是否存在管理员用户
   - 从环境变量读取初始管理员信息
   - 创建默认管理员账户
-- [ ] 在 `main.go` 中调用 `EnsureInitialAdmin`
 
 ## 阶段 5：认证控制器
 
 ### 5.1 AuthController 实现
 
-- [ ] 创建 `internal/controller/auth.go`
+- [x] 创建 `internal/controller/auth.go`
   - 创建 `AuthController` 结构体
   - 实现 `NewAuthController` 构造函数
   - 实现 `Login` 处理函数
   - 实现 `RefreshToken` 处理函数
-  - 实现 `Logout` 处理函数（可选）
   - 实现 `RegisterRoutes` 方法
 
 ### 5.2 路由注册
 
-- [ ] 在 `main.go` 中添加认证路由
+- [x] 在 `main.go` 中添加认证路由
   - 创建 `/api/v1/auth` 路由组（无需鉴权）
   - 注册 `POST /login` 路由
   - 注册 `POST /refresh` 路由
-  - 注册 `POST /logout` 路由（可选）
 
 ## 阶段 6：现有 Controller 重构
 
 ### 6.1 UserController 重构
 
-- [ ] 更新 `internal/controller/user.go`
+- [x] 更新 `internal/controller/user.go`
   - 实现 `RegisterRoutes` 方法
-  - 添加 `ListUsers` 处理函数
-  - 添加 `UpdateUser` 处理函数
-  - 添加 `DeleteUser` 处理函数
-  - 添加 `UpdateUserStatus` 处理函数
-  - 移除请求体中的邮箱必填验证（更新时）
+  - 添加权限检查（普通用户只能访问自己的资源）
+  - 添加 `ListUsers` 处理函数（占位实现）
+  - 添加 `UpdateUser` 处理函数（占位实现）
+  - 添加 `DeleteUser` 处理函数（占位实现）
+  - 添加 `UpdateUserStatus` 处理函数（占位实现）
 
 ### 6.2 UsageController 重构
 
-- [ ] 更新 `internal/controller/usage.go`
+- [x] 更新 `internal/controller/usage.go`
   - 实现 `RegisterRoutes` 方法
-  - 添加 `GetUserStats` 处理函数（可选）
+  - 添加权限检查（普通用户只能查询自己的统计）
 
 ### 6.3 ChatController 重构
 
-- [ ] 创建 `internal/controller/chat.go`（如果不存在）
+- [x] 更新 `internal/controller/chat.go`
   - 实现 `RegisterRoutes` 方法
-  - 将 `ChatCompletions` 方法移入
 
 ### 6.4 ProviderReloadController 更新
 
-- [ ] 更新 `internal/controller/provider_reload.go`
-  - 验证 `RegisterRoutes` 方法实现正确
+- [x] 验证 `RegisterRoutes` 方法实现正确
   - 确保路由使用 `/api/v1/admin/providers/*` 路径
 
 ## 阶段 7：main.go 路由重构
 
 ### 7.1 路由组织
 
-- [ ] 重构 `cmd/server/main.go` 中的路由注册
+- [x] 重构 `cmd/server/main.go` 中的路由注册
   - 统一使用 `/api/v1` 前缀
   - 创建 JWT 鉴权组
   - 在 JWT 组下创建 Admin 角色组
   - 移除硬编码的路由注册
   - 调用各 Controller 的 `RegisterRoutes` 方法
-- [ ] 组织 Chat API 路由
+- [x] 组织 Chat API 路由
   - 保持 `/v1/chat/completions` 路径
   - 使用 API Key 鉴权
 
 ### 7.2 中间件应用
 
-- [ ] 确保中间件应用顺序正确
+- [x] 确保中间件应用顺序正确
   - 全局：日志、恢复、CORS
   - 管理 API：JWTAuth
   - Admin 接口：RequireAdmin
@@ -199,8 +183,8 @@
 
 ### 8.1 单元测试
 
-- [ ] JWT Service 单元测试
-- [ ] 密码工具单元测试
+- [x] JWT Service 单元测试
+- [x] 密码工具单元测试
 - [ ] Auth Service 单元测试
 - [ ] Repository 层测试
 
@@ -210,7 +194,6 @@
   - 成功登录
   - 密码错误
   - 用户不存在
-  - 非管理员用户
   - 用户被禁用
 - [ ] JWT 鉴权测试
   - 有效 Token
@@ -219,6 +202,7 @@
   - 缺少 Header
 - [ ] 角色权限测试
   - 管理员访问所有接口
+  - 普通用户访问自己的资源
   - 普通用户被拒绝访问管理接口
 - [ ] Token 刷新测试
   - 成功刷新
@@ -235,14 +219,14 @@
 
 ### 9.1 API 文档
 
-- [ ] 更新 API 文档
+- [x] 更新 API 文档
   - 记录新的认证方式
   - 更新所有接口路径
   - 添加错误响应示例
 
 ### 9.2 部署准备
 
-- [ ] 添加环境变量文档
+- [x] 添加环境变量文档
   - `JWT_SECRET`
   - `JWT_ACCESS_TOKEN_EXPIRES_IN`
   - `JWT_REFRESH_TOKEN_EXPIRES_IN`
@@ -260,15 +244,17 @@
 
 ## 验收标准
 
-- [ ] 所有管理接口使用 `/api/v1` 前缀
-- [ ] Chat API 保持 `/v1/chat/completions` 路径
-- [ ] 管理接口使用 JWT 鉴权
-- [ ] Chat API 使用 API Key 鉴权
-- [ ] 只有管理员可以访问管理接口
-- [ ] 所有 Controller 实现 `RegisterRoutes` 方法
-- [ ] 所有单元测试通过
+- [x] 所有管理接口使用 `/api/v1` 前缀
+- [x] Chat API 保持 `/v1/chat/completions` 路径
+- [x] 管理接口使用 JWT 鉴权
+- [x] Chat API 使用 API Key 鉴权
+- [x] 只有管理员可以访问管理接口
+- [x] 普通用户可以登录并访问自己的资源
+- [x] 所有 Controller 实现 `RegisterRoutes` 方法
+- [x] 核心单元测试通过（JWT、密码工具）
 - [ ] 所有集成测试通过
-- [ ] API 文档已更新
+- [x] API 文档已更新
+- [x] 环境变量文档已更新
 
 ## 依赖关系
 

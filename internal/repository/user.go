@@ -21,11 +21,20 @@ type UserRepository interface {
 	// GetUserByEmail 按 email 查询用户
 	GetUserByEmail(ctx context.Context, email string) (*model.User, error)
 
+	// GetUserByEmailWithPassword 按 email 查询用户（包含密码哈希，用于登录验证）
+	GetUserByEmailWithPassword(ctx context.Context, email string) (*model.User, error)
+
 	// ListUsers 列出用户（支持分页和状态过滤）
 	ListUsers(ctx context.Context, status *string, limit, offset int) ([]*model.User, error)
 
 	// UpdateUserStatus 更新用户状态
 	UpdateUserStatus(ctx context.Context, id int64, status string) error
+
+	// UpdateUser 更新用户信息
+	UpdateUser(ctx context.Context, user *model.User) error
+
+	// UpdatePassword 更新用户密码
+	UpdatePassword(ctx context.Context, id int64, passwordHash string) error
 
 	// CreateAPIKey 创建 API Key
 	CreateAPIKey(ctx context.Context, key *model.APIKey) error
@@ -59,13 +68,15 @@ func NewUserRepository(db *sqlx.DB) UserRepository {
 // CreateUser 创建用户
 func (r *userRepository) CreateUser(ctx context.Context, user *model.User) error {
 	query := `
-		INSERT INTO users (name, email, status)
-		VALUES ($1, $2, $3)
+		INSERT INTO users (name, email, password_hash, role, status)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, created_at, updated_at
 	`
 	err := r.db.QueryRowContext(ctx, query,
 		user.Name,
 		user.Email,
+		user.PasswordHash,
+		user.Role,
 		user.Status,
 	).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
@@ -77,7 +88,7 @@ func (r *userRepository) CreateUser(ctx context.Context, user *model.User) error
 // GetUserByID 按 ID 查询用户
 func (r *userRepository) GetUserByID(ctx context.Context, id int64) (*model.User, error) {
 	var user model.User
-	query := `SELECT id, name, email, status, created_at, updated_at FROM users WHERE id = $1`
+	query := `SELECT id, name, email, role, status, created_at, updated_at FROM users WHERE id = $1`
 	err := r.db.GetContext(ctx, &user, query, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user by id: %w", err)
@@ -88,7 +99,7 @@ func (r *userRepository) GetUserByID(ctx context.Context, id int64) (*model.User
 // GetUserByEmail 按 email 查询用户
 func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
 	var user model.User
-	query := `SELECT id, name, email, status, created_at, updated_at FROM users WHERE email = $1`
+	query := `SELECT id, name, email, role, status, created_at, updated_at FROM users WHERE email = $1`
 	err := r.db.GetContext(ctx, &user, query, email)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user by email: %w", err)
@@ -96,10 +107,21 @@ func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (*mod
 	return &user, nil
 }
 
+// GetUserByEmailWithPassword 按 email 查询用户（包含密码哈希，用于登录验证）
+func (r *userRepository) GetUserByEmailWithPassword(ctx context.Context, email string) (*model.User, error) {
+	var user model.User
+	query := `SELECT id, name, email, password_hash, role, status, created_at, updated_at FROM users WHERE email = $1`
+	err := r.db.GetContext(ctx, &user, query, email)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user by email with password: %w", err)
+	}
+	return &user, nil
+}
+
 // ListUsers 列出用户
 func (r *userRepository) ListUsers(ctx context.Context, status *string, limit, offset int) ([]*model.User, error) {
 	var users []*model.User
-	query := `SELECT id, name, email, status, created_at, updated_at FROM users`
+	query := `SELECT id, name, email, role, status, created_at, updated_at FROM users`
 	args := []interface{}{}
 
 	if status != nil {
@@ -138,6 +160,40 @@ func (r *userRepository) UpdateUserStatus(ctx context.Context, id int64, status 
 	err := r.db.QueryRowContext(ctx, query, status, id).Scan(&updatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to update user status: %w", err)
+	}
+	return nil
+}
+
+// UpdateUser 更新用户信息
+func (r *userRepository) UpdateUser(ctx context.Context, user *model.User) error {
+	query := `
+		UPDATE users
+		SET name = $1, email = $2, role = $3, updated_at = NOW()
+		WHERE id = $4
+		RETURNING updated_at
+	`
+	err := r.db.QueryRowContext(ctx, query,
+		user.Name,
+		user.Email,
+		user.Role,
+		user.ID,
+	).Scan(&user.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("failed to update user: %w", err)
+	}
+	return nil
+}
+
+// UpdatePassword 更新用户密码
+func (r *userRepository) UpdatePassword(ctx context.Context, id int64, passwordHash string) error {
+	query := `
+		UPDATE users
+		SET password_hash = $1, updated_at = NOW()
+		WHERE id = $2
+	`
+	_, err := r.db.ExecContext(ctx, query, passwordHash, id)
+	if err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
 	}
 	return nil
 }

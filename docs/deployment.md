@@ -27,42 +27,54 @@ psql "host=localhost port=5432 user=courier password=courier dbname=courier sslm
 psql "host=localhost port=5432 user=courier password=courier dbname=courier sslmode=disable" -f migrations/000003_create_users.up.sql
 psql "host=localhost port=5432 user=courier password=courier dbname=courier sslmode=disable" -f migrations/000004_create_api_keys.up.sql
 psql "host=localhost port=5432 user=courier password=courier dbname=courier sslmode=disable" -f migrations/000005_create_usage_records.up.sql
+
+# 角色和密码迁移（JWT 认证）
+psql "host=localhost port=5432 user=courier password=courier dbname=courier sslmode=disable" -f migrations/000006_add_user_role.up.sql
+psql "host=localhost port=5432 user=courier password=courier dbname=courier sslmode=disable" -f migrations/000007_add_password_hash.up.sql
 ```
 
 ### 3. 运行服务
 
 ```bash
 export DATABASE_URL="host=localhost port=5432 user=courier password=courier dbname=courier sslmode=disable"
+export JWT_SECRET="your-jwt-secret-key-change-in-production"
+export INITIAL_ADMIN_EMAIL="admin@example.com"
+export INITIAL_ADMIN_PASSWORD="admin-password-change-me"
 go run cmd/server/main.go
 ```
 
 ### 4. 测试 API
 
 ```bash
-# 设置管理员 API Key
-export ADMIN_API_KEY="your-admin-key"
+# 登录获取 JWT Token
+ACCESS_TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@example.com",
+    "password": "admin-password-change-me"
+  }' | jq -r '.access_token')
 
 # 创建用户
-curl -X POST http://localhost:8080/v1/users \
+USER_RESPONSE=$(curl -s -X POST http://localhost:8080/api/v1/users \
   -H "Content-Type: application/json" \
-  -H "X-Admin-API-Key: $ADMIN_API_KEY" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -d '{
     "name": "张三",
     "email": "zhangsan@example.com"
-  }'
+  }')
+USER_ID=$(echo $USER_RESPONSE | jq -r '.id')
 
 # 为用户创建 API Key
-USER_ID="<返回的用户ID>"
-curl -X POST http://localhost:8080/v1/users/$USER_ID/api-keys \
+API_KEY_RESPONSE=$(curl -s -X POST "http://localhost:8080/api/v1/users/$USER_ID/api-keys" \
   -H "Content-Type: application/json" \
-  -H "X-Admin-API-Key: $ADMIN_API_KEY" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -d '{
     "name": "生产环境 Key"
-  }'
+  }')
+API_KEY=$(echo $API_KEY_RESPONSE | jq -r '.key')
 # 返回的 key 仅此一次可见，请妥善保存
 
 # 使用 API Key 调用 Chat API
-API_KEY="<返回的完整API Key>"
 curl -X POST http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $API_KEY" \
@@ -72,8 +84,8 @@ curl -X POST http://localhost:8080/v1/chat/completions \
   }'
 
 # 查询使用统计
-curl "http://localhost:8080/v1/usage?user_id=$USER_ID" \
-  -H "X-Admin-API-Key: $ADMIN_API_KEY"
+curl "http://localhost:8080/api/v1/usage?user_id=$USER_ID" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
 ### 5. 管理 Provider
@@ -82,7 +94,7 @@ curl "http://localhost:8080/v1/usage?user_id=$USER_ID" \
 # 创建 Provider（带 Fallback 配置）
 curl -X POST http://localhost:8080/api/v1/providers \
   -H "Content-Type: application/json" \
-  -H "X-Admin-API-Key: $ADMIN_API_KEY" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -d '{
     "name": "openai-main",
     "type": "openai",
@@ -95,11 +107,11 @@ curl -X POST http://localhost:8080/api/v1/providers \
 
 # 查询 Provider 列表
 curl http://localhost:8080/api/v1/providers \
-  -H "X-Admin-API-Key: $ADMIN_API_KEY"
+  -H "Authorization: Bearer $ACCESS_TOKEN"
 
 # 重载 Provider
 curl -X POST http://localhost:8080/api/v1/providers/reload \
-  -H "X-Admin-API-Key: $ADMIN_API_KEY"
+  -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
 ## Docker 部署
@@ -130,12 +142,17 @@ docker-compose down
 
 ## 环境变量
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| DATABASE_URL | PostgreSQL 连接字符串 | - |
-| PORT | HTTP 服务端口 | 8080 |
-| ADMIN_API_KEY | 管理员 API Key（必需，用于管理接口） | - |
-| LOG_LEVEL | 日志级别（debug/info/warn/error） | info |
+| 变量 | 说明 | 默认值 | 必需 |
+|------|------|--------|------|
+| DATABASE_URL | PostgreSQL 连接字符串 | - | ✓ |
+| PORT | HTTP 服务端口 | 8080 | - |
+| JWT_SECRET | JWT 签名密钥 | - | ✓ |
+| JWT_ACCESS_TOKEN_EXPIRES_IN | Access Token 有效期 | 15m | - |
+| JWT_REFRESH_TOKEN_EXPIRES_IN | Refresh Token 有效期 | 168h | - |
+| JWT_ISSUER | Token 发行者标识 | courier-gateway | - |
+| INITIAL_ADMIN_EMAIL | 初始管理员邮箱 | - | - |
+| INITIAL_ADMIN_PASSWORD | 初始管理员密码 | - | - |
+| LOG_LEVEL | 日志级别（debug/info/warn/error） | info | - |
 
 ## Provider 配置
 
@@ -197,7 +214,8 @@ migrate -path migrations -database "$DATABASE_URL" up
 
 1. **安全性**
    - 设置强密码的 DATABASE_URL
-   - 配置 ADMIN_API_KEY 启用管理员认证
+   - 设置强随机密钥的 JWT_SECRET（至少 32 字符）
+   - 配置 INITIAL_ADMIN_EMAIL 和 INITIAL_ADMIN_PASSWORD 创建初始管理员
    - 使用 HTTPS（配置反向代理如 Nginx）
 
 2. **性能**
@@ -217,6 +235,8 @@ migrate -path migrations -database "$DATABASE_URL" up
 git checkout <previous-commit>
 
 # 回滚数据库迁移（按相反顺序）
+psql $DATABASE_URL -f migrations/000007_add_password_hash.down.sql
+psql $DATABASE_URL -f migrations/000006_add_user_role.down.sql
 psql $DATABASE_URL -f migrations/000005_create_usage_records.down.sql
 psql $DATABASE_URL -f migrations/000004_create_api_keys.down.sql
 psql $DATABASE_URL -f migrations/000003_create_users.down.sql
@@ -226,19 +246,38 @@ psql $DATABASE_URL -f migrations/000001_create_providers.down.sql
 
 ## API 接口说明
 
-### 管理接口（需要 ADMIN_API_KEY）
+### 认证接口（无需鉴权）
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/v1/users` | 创建用户 |
-| GET | `/v1/users/:id` | 获取用户信息 |
-| POST | `/v1/users/:id/api-keys` | 为用户创建 API Key |
-| GET | `/v1/users/:id/api-keys` | 获取用户的 API Key 列表 |
-| DELETE | `/v1/users/:id/api-keys/:key_id` | 撤销 API Key |
-| GET | `/v1/usage` | 查询使用统计 |
+| POST | `/api/v1/auth/login` | 用户登录获取 JWT Token |
+| POST | `/api/v1/auth/refresh` | 刷新 JWT Token |
+
+### 管理接口（需要 JWT Token，Admin 角色）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/v1/users` | 创建用户 |
+| GET | `/api/v1/users` | 查询用户列表 |
+| DELETE | `/api/v1/users/:id` | 删除用户 |
+| PUT | `/api/v1/users/:id` | 更新用户 |
+| PATCH | `/api/v1/users/:id/status` | 更新用户状态 |
 | POST | `/api/v1/providers` | 创建 Provider |
 | GET | `/api/v1/providers` | 查询 Provider 列表 |
-| POST | `/api/v1/providers/reload` | 重载 Provider |
+| POST | `/api/v1/providers/reload` | 重载所有 Provider |
+| POST | `/api/v1/admin/providers/:name/reload` | 重载指定 Provider |
+| POST | `/api/v1/admin/providers/:name/enable` | 启用 Provider |
+| POST | `/api/v1/admin/providers/:name/disable` | 禁用 Provider |
+
+### 用户接口（需要 JWT Token）
+
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| GET | `/api/v1/users/:id` | 获取用户信息 | 管理员可获取任意用户，普通用户只能获取自己 |
+| POST | `/api/v1/users/:id/api-keys` | 为用户创建 API Key | 管理员可为任意用户创建，普通用户只能为自己创建 |
+| GET | `/api/v1/users/:id/api-keys` | 获取用户的 API Key 列表 | 管理员可查看任意用户，普通用户只能查看自己 |
+| DELETE | `/api/v1/users/:id/api-keys/:key_id` | 撤销 API Key | 管理员可撤销任意用户的，普通用户只能撤销自己的 |
+| GET | `/api/v1/usage` | 查询使用统计 | 管理员可查询所有用户，普通用户只能查询自己 |
 
 ### Chat API（需要用户 API Key）
 
@@ -246,7 +285,9 @@ psql $DATABASE_URL -f migrations/000001_create_providers.down.sql
 |------|------|------|
 | POST | `/v1/chat/completions` | Chat Completions（OpenAI 兼容） |
 
-### API Key 格式
+### 认证方式
 
-- **管理员 API Key**：通过 `X-Admin-API-Key` Header 传递，用于管理接口
-- **用户 API Key**：格式为 `sk-courier-<32位随机字符>`，通过 `Authorization: Bearer <key>` 传递
+- **JWT Token**：通过 `Authorization: Bearer <token>` 传递，用于管理接口和用户接口
+- **用户 API Key**：格式为 `sk-<32位随机字符>`，通过 `Authorization: Bearer <key>` 传递，用于 Chat API
+
+详细认证说明请参考 [authentication.md](./authentication.md)

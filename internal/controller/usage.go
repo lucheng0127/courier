@@ -5,34 +5,55 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lucheng0127/courier/internal/middleware"
 	"github.com/lucheng0127/courier/internal/model"
 	"github.com/lucheng0127/courier/internal/service"
 )
 
 // UsageController 使用统计控制器
 type UsageController struct {
-	usageService *service.UsageService
+	usageSvc *service.UsageService
 }
 
 // NewUsageController 创建 Usage Controller
-func NewUsageController(usageService *service.UsageService) *UsageController {
+func NewUsageController(usageSvc *service.UsageService) *UsageController {
 	return &UsageController{
-		usageService: usageService,
+		usageSvc: usageSvc,
 	}
 }
 
+// RegisterRoutes 注册路由
+func (c *UsageController) RegisterRoutes(r *gin.RouterGroup) {
+	r.GET("/usage", c.GetUsageStats)
+	// 权限说明：
+	// - 管理员：可查询任意用户或所有用户的统计（通过 user_id 参数过滤）
+	// - 普通用户：只能查询自己的统计（自动过滤 user_id 参数）
+}
+
 // GetUsageStats 查询使用统计
-// GET /v1/usage?user_id=<id>&start_date=<date>&end_date=<date>&group_by=<field>
+// GET /api/v1/usage?user_id=<id>&start_date=<date>&end_date=<date>&group_by=<field>
+// 权限：管理员可查询所有用户，普通用户只能查询自己
 func (c *UsageController) GetUsageStats(ctx *gin.Context) {
 	var req model.UsageStatsRequest
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": gin.H{
-				"message": err.Error(),
-				"type":    "invalid_request_error",
-			},
+			"message": err.Error(),
+			"type":    "invalid_request_error",
 		})
 		return
+	}
+
+	// 权限检查：普通用户只能查询自己的统计
+	userID, hasAuth := middleware.GetUserID(ctx)
+	userRole, _ := middleware.GetUserRole(ctx)
+	if hasAuth && userRole != "admin" {
+		// 普通用户强制使用自己的 user_id，忽略传入的参数
+		req.UserID = userID
+	}
+
+	// 如果 user_id 为 0（未设置），使用当前用户的 ID
+	if req.UserID == 0 && hasAuth {
+		req.UserID = userID
 	}
 
 	// 设置默认的 group_by 为 day
@@ -43,23 +64,19 @@ func (c *UsageController) GetUsageStats(ctx *gin.Context) {
 	// 验证 group_by 值
 	if req.GroupBy != "day" && req.GroupBy != "model" {
 		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": gin.H{
-				"message": "Invalid group_by parameter. Must be 'day' or 'model'",
-				"type":    "invalid_request_error",
-			},
+			"message": "Invalid group_by parameter. Must be 'day' or 'model'",
+			"type":    "invalid_request_error",
 		})
 		return
 	}
 
 	// 解析时间参数
 	if startDateStr := ctx.Query("start_date"); startDateStr != "" {
-	 startDate, err := time.Parse(time.RFC3339, startDateStr)
+		startDate, err := time.Parse(time.RFC3339, startDateStr)
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{
-				"error": gin.H{
-					"message": "Invalid start_date format. Use RFC3339 format",
-					"type":    "invalid_request_error",
-				},
+				"message": "Invalid start_date format. Use RFC3339 format",
+				"type":    "invalid_request_error",
 			})
 			return
 		}
@@ -70,32 +87,26 @@ func (c *UsageController) GetUsageStats(ctx *gin.Context) {
 		endDate, err := time.Parse(time.RFC3339, endDateStr)
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{
-				"error": gin.H{
-					"message": "Invalid end_date format. Use RFC3339 format",
-					"type":    "invalid_request_error",
-				},
+				"message": "Invalid end_date format. Use RFC3339 format",
+				"type":    "invalid_request_error",
 			})
 			return
 		}
 		req.EndDate = &endDate
 	}
 
-	stats, err := c.usageService.GetUsageStats(ctx, &req)
+	stats, err := c.usageSvc.GetUsageStats(ctx, &req)
 	if err != nil {
 		if err.Error() == "user not found" {
 			ctx.JSON(http.StatusNotFound, gin.H{
-				"error": gin.H{
-					"message": "User not found",
-					"type":    "invalid_request_error",
-				},
+				"message": "User not found",
+				"type":    "invalid_request_error",
 			})
 			return
 		}
 		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error": gin.H{
-				"message": "Failed to get usage stats",
-				"type":    "api_error",
-			},
+			"message": "Failed to get usage stats",
+			"type":    "api_error",
 		})
 		return
 	}

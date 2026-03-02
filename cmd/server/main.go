@@ -25,14 +25,12 @@ import (
 func main() {
 	log.Println("Starting Courier LLM Gateway...")
 
-	// TODO: 从配置文件加载数据库连接
-	// 数据库连接字符串格式: host=localhost port=5432 user=courier password=courier dbname=courier sslmode=disable
+	// 数据库连接
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
 		dbURL = "host=localhost port=5432 user=courier password=courier dbname=courier sslmode=disable"
 	}
 
-	// 连接数据库
 	db, err := sqlx.Connect("postgres", dbURL)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
@@ -47,53 +45,32 @@ func main() {
 	usageRepo := repository.NewUsageRepository(db)
 
 	// 初始化 Service
+	jwtSvc, err := service.NewJWTService()
+	if err != nil {
+		log.Fatalf("Failed to initialize JWT service: %v", err)
+	}
+
 	providerSvc := service.NewProviderService(providerRepo)
-	authSvc := service.NewAuthService(userRepo)
+	authSvc := service.NewAuthService(userRepo, jwtSvc)
 	usageSvc := service.NewUsageService(usageRepo, userRepo)
 	routerSvc := service.NewRouterService()
 
-	// 初始化 Providers（导入 Adapter 包触发 init 注册）
+	// 确保存在初始管理员用户
+	if err := authSvc.EnsureInitialAdmin(context.Background()); err != nil {
+		log.Printf("Warning: Failed to ensure initial admin: %v", err)
+	}
+
+	// 初始化 Providers
 	ctx := context.Background()
 	if err := bootstrap.InitProviders(ctx, providerSvc); err != nil {
 		log.Printf("Warning: Provider initialization had issues: %v", err)
 	}
 
-	// 启动 HTTP 服务器
+	// 创建路由
 	router := gin.Default()
-	api := router.Group("/api/v1")
-	v1 := router.Group("/v1")
 
-	// Provider 管理 API
-	providerCtrl := controller.NewProviderController(providerSvc)
-	providerCtrl.RegisterRoutes(api)
-
-	// Provider 重载 API（管理员）
-	reloadCtrl := controller.NewProviderReloadController(providerSvc)
-	adminGroup := api.Group("")
-	adminGroup.Use(middleware.AdminAuth())
-	reloadCtrl.RegisterRoutes(adminGroup)
-
-	// 用户和 API Key 管理 API（管理员）
-	userCtrl := controller.NewUserController(authSvc)
-	userGroup := v1.Group("/users")
-	userGroup.Use(middleware.AdminAuth())
-	userGroup.POST("", userCtrl.CreateUser)
-	userGroup.GET("/:id", userCtrl.GetUser)
-	userGroup.POST("/:id/api-keys", userCtrl.CreateAPIKey)
-	userGroup.GET("/:id/api-keys", userCtrl.ListAPIKeys)
-	userGroup.DELETE("/:id/api-keys/:key_id", userCtrl.RevokeAPIKey)
-
-	// 使用统计 API（管理员）
-	usageCtrl := controller.NewUsageController(usageSvc)
-	usageGroup := v1.Group("/usage")
-	usageGroup.Use(middleware.AdminAuth())
-	usageGroup.GET("", usageCtrl.GetUsageStats)
-
-	// Chat Completions API（需要 API Key 鉴权）
-	chatCtrl := controller.NewChatController(routerSvc, usageSvc)
-	chatGroup := v1.Group("")
-	chatGroup.Use(middleware.APIKeyAuth(authSvc), middleware.TraceID())
-	chatGroup.POST("/chat/completions", chatCtrl.ChatCompletions)
+	// 设置路由
+	setupRoutes(router, providerSvc, authSvc, usageSvc, routerSvc, jwtSvc)
 
 	// 启动服务器
 	addr := ":8080"
@@ -135,4 +112,47 @@ func main() {
 	}
 
 	log.Println("Server exited")
+}
+
+// setupRoutes 设置所有路由
+func setupRoutes(router *gin.Engine, providerSvc *service.ProviderService, authSvc *service.AuthService, usageSvc *service.UsageService, routerSvc *service.RouterService, jwtSvc service.JWTService) {
+	// API v1 组（管理接口）
+	api := router.Group("/api/v1")
+
+	// ========== 认证接口（无需鉴权） ==========
+	authCtrl := controller.NewAuthController(authSvc)
+	authCtrl.RegisterRoutes(api)
+
+	// ========== 需要 JWT 鉴权的组 ==========
+	jwtAuth := api.Group("")
+	jwtAuth.Use(middleware.JWTAuth(jwtSvc))
+
+	// ========== 需要 Admin 角色的组 ==========
+	adminOnly := jwtAuth.Group("")
+	adminOnly.Use(middleware.RequireAdmin())
+
+	// Provider 管理（仅管理员）
+	providerCtrl := controller.NewProviderController(providerSvc)
+	providerCtrl.RegisterRoutes(adminOnly)
+
+	// Provider 运维（仅管理员）
+	reloadCtrl := controller.NewProviderReloadController(providerSvc)
+	reloadCtrl.RegisterRoutes(adminOnly)
+
+	// ========== 用户管理接口 ==========
+	// 管理员可管理所有用户，普通用户可查看自己、管理自己的 API Key
+	userCtrl := controller.NewUserController(authSvc)
+	userCtrl.RegisterRoutes(jwtAuth)
+
+	// ========== 使用统计接口 ==========
+	// 管理员可查看所有用户，普通用户只能查看自己的
+	usageCtrl := controller.NewUsageController(usageSvc)
+	usageCtrl.RegisterRoutes(jwtAuth)
+
+	// ========== Chat API（使用 API Key 鉴权） ==========
+	v1 := router.Group("/v1")
+	chatCtrl := controller.NewChatController(routerSvc, usageSvc)
+	chatGroup := v1.Group("")
+	chatGroup.Use(middleware.APIKeyAuth(authSvc), middleware.TraceID())
+	chatCtrl.RegisterRoutes(chatGroup)
 }
