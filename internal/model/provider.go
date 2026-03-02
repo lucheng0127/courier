@@ -32,14 +32,15 @@ func (j *JSON) Scan(value any) error {
 
 // Provider 配置模型
 type Provider struct {
-	ID          int64     `json:"id" db:"id"`
-	Name        string    `json:"name" db:"name"`               // 必填：唯一标识
-	Type        string    `json:"type" db:"type"`               // 必填：openai, anthropic, vllm 等
-	BaseURL     string    `json:"base_url" db:"base_url"`       // 必填：API 地址
-	Timeout     int       `json:"timeout" db:"timeout"`         // 必填：超时时间（秒），默认 300
-	APIKey      *string   `json:"api_key,omitempty" db:"api_key"` // 可选：SaaS 需要
-	ExtraConfig JSON      `json:"extra_config,omitempty" db:"extra_config"` // 可选：扩展配置
-	Enabled     bool      `json:"enabled" db:"enabled"`         // 启用状态，默认 true
-	CreatedAt   time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
+	ID            int64     `json:"id" db:"id"`
+	Name          string    `json:"name" db:"name"`               // 必填：唯一标识
+	Type          string    `json:"type" db:"type"`               // 必填：openai, anthropic, vllm 等
+	BaseURL       string    `json:"base_url" db:"base_url"`       // 必填：API 地址
+	Timeout       int       `json:"timeout" db:"timeout"`         // 必填：超时时间（秒），默认 300
+	APIKey        *string   `json:"api_key,omitempty" db:"api_key"` // 可选：SaaS 需要
+	ExtraConfig   JSON      `json:"extra_config,omitempty" db:"extra_config"` // 可选：扩展配置
+	Enabled       bool      `json:"enabled" db:"enabled"`         // 启用状态，默认 true
+	FallbackModels JSON     `json:"fallback_models,omitempty" db:"fallback_models"` // 可选：Fallback 模型列表 ["model-1", "model-2"]
+	CreatedAt     time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
 }

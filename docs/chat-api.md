@@ -227,12 +227,16 @@ curl -X POST http://localhost:8080/api/v1/providers \
 
 每个请求都会记录日志（JSON 格式），包含：
 
+- `trace_id` - 链路追踪 ID
 - `request_id` - 请求 ID
 - `api_key` - API Key（脱敏）
 - `model` - 完整模型名称
 - `provider_name` - Provider 名称
 - `provider_type` - Provider 类型
 - `model_name` - 模型名称
+- `fallback_count` - Fallback 次数
+- `final_model` - 最终使用的模型
+- `attempt_details` - 每次尝试的详情
 - `prompt_tokens` - 输入 token 数
 - `completion_tokens` - 输出 token 数
 - `total_tokens` - 总 token 数
@@ -240,3 +244,79 @@ curl -X POST http://localhost:8080/api/v1/providers \
 - `status` - 状态（success/error）
 - `error` - 错误信息（如果有）
 - `timestamp` - 时间戳
+
+### 日志示例
+
+```json
+{
+  "timestamp": "2026-03-02T12:00:00Z",
+  "level": "info",
+  "message": "Chat request completed",
+  "trace_id": "trace-550e8400-e29b-41d4-a716-446655440000",
+  "request_id": "chatcmpl-123",
+  "api_key": "sk-...key",
+  "provider": "openai-main",
+  "model": "openai-main/gpt-4o",
+  "fallback_count": 1,
+  "final_model": "gpt-4o-mini",
+  "latency_ms": 1250,
+  "status": "success"
+}
+```
+
+## Fallback 重试机制
+
+当模型调用失败时，系统会自动尝试 Fallback 列表中的下一个模型。
+
+### 触发条件
+
+- 超时错误
+- 网络错误（连接失败、DNS 解析失败）
+- 5xx 服务器错误
+- 连接拒绝
+
+### 不触发 Fallback
+
+- 4xx 客户端错误（参数错误）
+- 认证失败
+- 模型不存在
+
+### Fallback 耗尽响应
+
+当所有 Fallback 模型都失败时：
+
+```json
+{
+  "error": {
+    "message": "All models failed after 3 attempts. Last error: timeout",
+    "type": "service_unavailable",
+    "details": [
+      {
+        "model": "gpt-4o",
+        "error_type": "timeout",
+        "duration_ms": 30000
+      },
+      {
+        "model": "gpt-4o-mini",
+        "error_type": "server_error",
+        "duration_ms": 2500
+      },
+      {
+        "model": "gpt-3.5-turbo",
+        "error_type": "timeout",
+        "duration_ms": 30000
+      }
+    ]
+  }
+}
+```
+
+### TraceID
+
+每个请求都会生成唯一的 TraceID，可通过响应头获取：
+
+```http
+X-Trace-ID: trace-550e8400-e29b-41d4-a716-446655440000
+```
+
+TraceID 用于追踪请求链路，方便排查问题。
