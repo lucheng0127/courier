@@ -17,6 +17,12 @@ type Provider interface {
 
 	// Name 返回 Provider 实例名称
 	Name() string
+
+	// Timeout 返回 Provider 超时时间（秒）
+	Timeout() int
+
+	// Config 返回 Provider 配置信息（用于获取 fallback_models 等）
+	Config() map[string]any
 }
 
 // ChatRequest 聊天请求

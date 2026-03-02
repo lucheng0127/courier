@@ -47,6 +47,16 @@ func (a *Adapter) Name() string {
 	return a.config.Name
 }
 
+// Timeout 返回超时时间（秒）
+func (a *Adapter) Timeout() int {
+	return a.config.TimeoutSeconds
+}
+
+// Config 返回配置信息
+func (a *Adapter) Config() map[string]any {
+	return a.config.GetConfig()
+}
+
 func init() {
 	adapter.RegisterAdapterType(adapter.AdapterTypeOpenAI, NewAdapter)
 }
