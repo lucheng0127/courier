@@ -26,7 +26,7 @@ type APIKey struct {
     ID           string    `json:"id" db:"id"`
     UserID       string    `json:"user_id" db:"user_id"`
     KeyHash      string    `json:"-" db:"key_hash"` // SHA256 哈希存储
-    KeyPrefix    string    `json:"key_prefix" db:"key_prefix"` // 前8位用于识别
+    KeyPrefix    string    `json:"key_prefix" db:"key_prefix"` // 前10位用于识别
     Name         string    `json:"name" db:"name"` // 用户定义的名称
     Status       string    `json:"status" db:"status"` // active, disabled, revoked
     LastUsedAt   *time.Time `json:"last_used_at" db:"last_used_at"`
@@ -37,7 +37,7 @@ type APIKey struct {
 
 **设计决策**：
 - API Key 使用 SHA256 哈希存储，原始 Key 只在创建时返回一次
-- 存储前 8 位（key_prefix）用于日志和管理界面识别
+- 存储前 10 位（key_prefix）用于日志和管理界面识别
 - 支持过期时间和状态管理（active/disabled/revoked）
 
 ### 使用记录 (UsageRecord)
@@ -86,7 +86,7 @@ CREATE TABLE api_keys (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     key_hash VARCHAR(64) UNIQUE NOT NULL,
-    key_prefix VARCHAR(8) NOT NULL,
+    key_prefix VARCHAR(10) NOT NULL,
     name VARCHAR(255) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'active',
     last_used_at TIMESTAMP,
@@ -180,15 +180,15 @@ X-Admin-API-Key: <admin_key>
 Response:
 {
   "id": "key-id",
-  "key": "sk-courier-xxxxx...",  // 仅在创建时返回一次
-  "key_prefix": "sk-cour",
+  "key": "sk-xxxxxx...",  // 仅在创建时返回一次
+  "key_prefix": "sk-xxxxxx",
   "name": "生产环境 Key",
   "status": "active",
   "created_at": "2026-03-02T12:00:00Z"
 }
 ```
 
-**设计决策**：API Key 格式为 `sk-courier-<随机32字符>`，使用 crypto/rand 生成。
+**设计决策**：API Key 格式为 `sk-<随机32字符>`，使用 crypto/rand 生成。
 
 #### 获取用户的 API Key 列表
 ```
@@ -200,7 +200,7 @@ Response:
   "api_keys": [
     {
       "id": "key-id",
-      "key_prefix": "sk-cour",
+      "key_prefix": "sk-xxxxxx",
       "name": "生产环境 Key",
       "status": "active",
       "last_used_at": "2026-03-02T13:00:00Z",

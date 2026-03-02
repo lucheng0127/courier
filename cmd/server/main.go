@@ -43,9 +43,13 @@ func main() {
 
 	// 初始化 Repository
 	providerRepo := repository.NewProviderRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	usageRepo := repository.NewUsageRepository(db)
 
 	// 初始化 Service
 	providerSvc := service.NewProviderService(providerRepo)
+	authSvc := service.NewAuthService(userRepo)
+	usageSvc := service.NewUsageService(usageRepo, userRepo)
 	routerSvc := service.NewRouterService()
 
 	// 初始化 Providers（导入 Adapter 包触发 init 注册）
@@ -69,10 +73,26 @@ func main() {
 	adminGroup.Use(middleware.AdminAuth())
 	reloadCtrl.RegisterRoutes(adminGroup)
 
+	// 用户和 API Key 管理 API（管理员）
+	userCtrl := controller.NewUserController(authSvc)
+	userGroup := v1.Group("/users")
+	userGroup.Use(middleware.AdminAuth())
+	userGroup.POST("", userCtrl.CreateUser)
+	userGroup.GET("/:id", userCtrl.GetUser)
+	userGroup.POST("/:id/api-keys", userCtrl.CreateAPIKey)
+	userGroup.GET("/:id/api-keys", userCtrl.ListAPIKeys)
+	userGroup.DELETE("/:id/api-keys/:key_id", userCtrl.RevokeAPIKey)
+
+	// 使用统计 API（管理员）
+	usageCtrl := controller.NewUsageController(usageSvc)
+	usageGroup := v1.Group("/usage")
+	usageGroup.Use(middleware.AdminAuth())
+	usageGroup.GET("", usageCtrl.GetUsageStats)
+
 	// Chat Completions API（需要 API Key 鉴权）
-	chatCtrl := controller.NewChatController(routerSvc)
+	chatCtrl := controller.NewChatController(routerSvc, usageSvc)
 	chatGroup := v1.Group("")
-	chatGroup.Use(middleware.APIKeyAuth(), middleware.TraceID())
+	chatGroup.Use(middleware.APIKeyAuth(authSvc), middleware.TraceID())
 	chatGroup.POST("/chat/completions", chatCtrl.ChatCompletions)
 
 	// 启动服务器
@@ -101,6 +121,11 @@ func main() {
 	<-quit
 
 	log.Println("Shutting down...")
+
+	// 关闭 Usage Service
+	if err := usageSvc.Close(); err != nil {
+		log.Printf("Failed to close usage service: %v", err)
+	}
 
 	// 优雅关闭服务器
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

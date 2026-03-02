@@ -18,15 +18,17 @@ import (
 
 // ChatController Chat API 控制器
 type ChatController struct {
-	router      *service.RouterService
-	retrySvc    *service.RetryService
+	router       *service.RouterService
+	retrySvc     *service.RetryService
+	usageService *service.UsageService
 }
 
 // NewChatController 创建 Chat 控制器
-func NewChatController(router *service.RouterService) *ChatController {
+func NewChatController(router *service.RouterService, usageService *service.UsageService) *ChatController {
 	return &ChatController{
-		router:   router,
-		retrySvc: service.NewRetryService(),
+		router:       router,
+		retrySvc:     service.NewRetryService(),
+		usageService: usageService,
 	}
 }
 
@@ -378,6 +380,10 @@ func (c *ChatController) logRequestWithRetry(ctx *gin.Context, requestID string,
 	traceID := middleware.GetTraceID(ctx)
 	apiKeyMasked, _ := ctx.Get("api_key_masked")
 
+	// 获取用户信息（从中间件注入）
+	userID, hasUserID := ctx.Get("user_id")
+	apiKeyID, hasAPIKeyID := ctx.Get("api_key_id")
+
 	status := "success"
 	errorMsg := ""
 
@@ -451,5 +457,32 @@ func (c *ChatController) logRequestWithRetry(ctx *gin.Context, requestID string,
 			"attempt_count":   len(log.AttemptDetails),
 			"error":           log.Error,
 		})
+	}
+
+	// 如果有用户信息，记录使用量到数据库
+	if hasUserID && hasAPIKeyID && c.usageService != nil {
+		record := &model.UsageRecord{
+			UserID:           userID.(int64),
+			APIKeyID:         apiKeyID.(int64),
+			RequestID:        requestID,
+			TraceID:          traceID,
+			Model:            req.Model,
+			ProviderName:     modelInfo.ProviderName,
+			PromptTokens:     log.PromptTokens,
+			CompletionTokens: log.CompletionTokens,
+			TotalTokens:      log.TotalTokens,
+			LatencyMs:        latencyMs,
+			Status:           status,
+			ErrorType:        errorMsg,
+		}
+
+		// 异步记录使用量（使用独立 context）
+		if err := c.usageService.RecordUsage(context.Background(), record); err != nil {
+			logger.Error("Failed to record usage", map[string]any{
+				"request_id": requestID,
+				"user_id":    userID,
+				"error":      err.Error(),
+			})
+		}
 	}
 }

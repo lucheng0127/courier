@@ -37,7 +37,7 @@
 #### Scenario: API Key 格式
 
 - **WHEN** 创建新 API Key 时
-- **THEN** API Key 格式为 `sk-courier-<32位随机字符>`
+- **THEN** API Key 格式为 `sk-<32位随机字符>`
 - **AND** 使用加密安全的随机数生成器
 - **AND** 仅在创建响应中返回完整 Key 一次
 
@@ -45,7 +45,7 @@
 
 - **WHEN** 存储 API Key 时
 - **THEN** 使用 SHA256 哈希存储完整 Key
-- **AND** 存储前 8 位作为 `key_prefix` 用于识别
+- **AND** 存储前 10 位作为 `key_prefix` 用于识别
 - **AND** 哈希值在数据库中唯一
 
 #### Scenario: API Key 关联用户
