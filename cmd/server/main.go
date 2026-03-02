@@ -72,7 +72,7 @@ func main() {
 	// Chat Completions API（需要 API Key 鉴权）
 	chatCtrl := controller.NewChatController(routerSvc)
 	chatGroup := v1.Group("")
-	chatGroup.Use(middleware.APIKeyAuth())
+	chatGroup.Use(middleware.APIKeyAuth(), middleware.TraceID())
 	chatGroup.POST("/chat/completions", chatCtrl.ChatCompletions)
 
 	// 启动服务器

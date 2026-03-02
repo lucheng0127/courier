@@ -45,8 +45,8 @@ func NewProviderRepository(db *sqlx.DB) ProviderRepository {
 // Create 创建 Provider
 func (r *providerRepository) Create(ctx context.Context, provider *model.Provider) error {
 	query := `
-		INSERT INTO providers (name, type, base_url, timeout, api_key, extra_config, enabled)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO providers (name, type, base_url, timeout, api_key, extra_config, enabled, fallback_models)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id, created_at, updated_at
 	`
 	err := r.db.QueryRowContext(ctx, query,
@@ -57,6 +57,7 @@ func (r *providerRepository) Create(ctx context.Context, provider *model.Provide
 		provider.APIKey,
 		provider.ExtraConfig,
 		provider.Enabled,
+		provider.FallbackModels,
 	).Scan(&provider.ID, &provider.CreatedAt, &provider.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to create provider: %w", err)
@@ -67,7 +68,7 @@ func (r *providerRepository) Create(ctx context.Context, provider *model.Provide
 // GetByID 按 ID 查询
 func (r *providerRepository) GetByID(ctx context.Context, id int64) (*model.Provider, error) {
 	var provider model.Provider
-	query := `SELECT id, name, type, base_url, timeout, api_key, extra_config, enabled, created_at, updated_at FROM providers WHERE id = $1`
+	query := `SELECT id, name, type, base_url, timeout, api_key, extra_config, enabled, fallback_models, created_at, updated_at FROM providers WHERE id = $1`
 	err := r.db.GetContext(ctx, &provider, query, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get provider by id: %w", err)
@@ -78,7 +79,7 @@ func (r *providerRepository) GetByID(ctx context.Context, id int64) (*model.Prov
 // GetByName 按 name 查询
 func (r *providerRepository) GetByName(ctx context.Context, name string) (*model.Provider, error) {
 	var provider model.Provider
-	query := `SELECT id, name, type, base_url, timeout, api_key, extra_config, enabled, created_at, updated_at FROM providers WHERE name = $1`
+	query := `SELECT id, name, type, base_url, timeout, api_key, extra_config, enabled, fallback_models, created_at, updated_at FROM providers WHERE name = $1`
 	err := r.db.GetContext(ctx, &provider, query, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get provider by name: %w", err)
@@ -89,7 +90,7 @@ func (r *providerRepository) GetByName(ctx context.Context, name string) (*model
 // List 列出所有 Provider
 func (r *providerRepository) List(ctx context.Context) ([]*model.Provider, error) {
 	var providers []*model.Provider
-	query := `SELECT id, name, type, base_url, timeout, api_key, extra_config, enabled, created_at, updated_at FROM providers ORDER BY name`
+	query := `SELECT id, name, type, base_url, timeout, api_key, extra_config, enabled, fallback_models, created_at, updated_at FROM providers ORDER BY name`
 	err := r.db.SelectContext(ctx, &providers, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list providers: %w", err)
@@ -101,8 +102,8 @@ func (r *providerRepository) List(ctx context.Context) ([]*model.Provider, error
 func (r *providerRepository) Update(ctx context.Context, provider *model.Provider) error {
 	query := `
 		UPDATE providers
-		SET type = $1, base_url = $2, timeout = $3, api_key = $4, extra_config = $5, enabled = $6, updated_at = NOW()
-		WHERE id = $7
+		SET type = $1, base_url = $2, timeout = $3, api_key = $4, extra_config = $5, enabled = $6, fallback_models = $7, updated_at = NOW()
+		WHERE id = $8
 		RETURNING updated_at
 	`
 	err := r.db.QueryRowContext(ctx, query,
@@ -112,6 +113,7 @@ func (r *providerRepository) Update(ctx context.Context, provider *model.Provide
 		provider.APIKey,
 		provider.ExtraConfig,
 		provider.Enabled,
+		provider.FallbackModels,
 		provider.ID,
 	).Scan(&provider.UpdatedAt)
 	if err != nil {
