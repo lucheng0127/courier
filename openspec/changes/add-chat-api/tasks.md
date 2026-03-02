@@ -2,17 +2,17 @@
 
 ## 1. 数据模型层
 
-- [ ] 1.1 定义 Chat 请求模型（`internal/model/chat.go`）
+- [x] 1.1 定义 Chat 请求模型（`internal/model/chat.go`）
   - `ChatRequest` - 兼容 OpenAI 格式
   - `ChatMessage` - 消息结构
   - `ChatResponse` - 非流式响应
   - `ChatStreamChunk` - 流式响应块
-- [ ] 1.2 定义日志模型（`internal/model/log.go`）
+- [x] 1.2 定义日志模型（`internal/model/log.go`）
   - `ChatLog` - 请求日志结构
 
 ## 2. 路由服务层
 
-- [ ] 2.1 实现模型路由服务（`internal/service/router.go`）
+- [x] 2.1 实现模型路由服务（`internal/service/router.go`）
   - `ParseModel(model)` - 解析 `provider/model_name` 格式
   - `ResolveProvider(providerName)` - 根据 provider 名称获取 Provider 实例
   - `GetAvailableModels()` - 获取所有可用模型列表（格式：`provider/model_name`）
@@ -25,43 +25,43 @@
 
 ## 3. API Key 鉴权中间件
 
-- [ ] 3.1 实现 API Key 验证中间件（`internal/middleware/apikey.go`）
+- [x] 3.1 实现 API Key 验证中间件（`internal/middleware/apikey.go`）
   - 从 Authorization Header 提取 API Key
   - 验证 API Key 有效性
   - 返回 401 错误（验证失败时）
-- [ ] 3.2 配置 API Key 白名单（环境变量或配置文件）
+- [x] 3.2 配置 API Key 白名单（环境变量或配置文件）
 - [ ] 3.3 编写中间件单元测试
 
 ## 4. Chat API 控制器
 
-- [ ] 4.1 实现 Chat Completions 控制器（`internal/controller/chat.go`）
+- [x] 4.1 实现 Chat Completions 控制器（`internal/controller/chat.go`）
   - `ChatCompletions()` - 主处理函数
   - 支持非流式和流式响应
   - 调用路由服务获取 Provider
   - 调用 Provider 的 Chat/ChatStream 方法
   - 转换响应格式
-- [ ] 4.2 实现流式响应处理
+- [x] 4.2 实现流式响应处理
   - 设置正确的 SSE Header
   - 逐块发送数据
   - 处理客户端断开连接
-- [ ] 4.3 实现响应格式转换
+- [x] 4.3 实现响应格式转换
   - Provider 格式 → OpenAI 格式
   - 生成请求 ID 和时间戳
 - [ ] 4.4 编写控制器单元测试
 
 ## 5. 请求日志
 
-- [ ] 5.1 实现日志记录器（`internal/logger/chat.go`）
+- [x] 5.1 实现日志记录器（集成在控制器中）
   - `LogRequest()` - 记录请求
   - API Key 脱敏
   - JSON 格式输出
-- [ ] 5.2 集成到 Chat 控制器
+- [x] 5.2 集成到 Chat 控制器
 
 ## 6. 路由注册
 
-- [ ] 6.1 在 main.go 中注册 Chat API 路由
+- [x] 6.1 在 main.go 中注册 Chat API 路由
   - `POST /v1/chat/completions`
-- [ ] 6.2 应用 API Key 鉴权中间件
+- [x] 6.2 应用 API Key 鉴权中间件
 - [ ] 6.3 配置 CORS（如果需要）
 
 ## 7. 配置管理
