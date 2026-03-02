@@ -22,6 +22,11 @@ psql "host=localhost port=5432 user=courier password=courier dbname=courier sslm
 
 # Fallback 重试迁移
 psql "host=localhost port=5432 user=courier password=courier dbname=courier sslmode=disable" -f migrations/000002_add_fallback_models.up.sql
+
+# 用户和 API Key 管理迁移
+psql "host=localhost port=5432 user=courier password=courier dbname=courier sslmode=disable" -f migrations/000003_create_users.up.sql
+psql "host=localhost port=5432 user=courier password=courier dbname=courier sslmode=disable" -f migrations/000004_create_api_keys.up.sql
+psql "host=localhost port=5432 user=courier password=courier dbname=courier sslmode=disable" -f migrations/000005_create_usage_records.up.sql
 ```
 
 ### 3. 运行服务
@@ -34,9 +39,50 @@ go run cmd/server/main.go
 ### 4. 测试 API
 
 ```bash
+# 设置管理员 API Key
+export ADMIN_API_KEY="your-admin-key"
+
+# 创建用户
+curl -X POST http://localhost:8080/v1/users \
+  -H "Content-Type: application/json" \
+  -H "X-Admin-API-Key: $ADMIN_API_KEY" \
+  -d '{
+    "name": "张三",
+    "email": "zhangsan@example.com"
+  }'
+
+# 为用户创建 API Key
+USER_ID="<返回的用户ID>"
+curl -X POST http://localhost:8080/v1/users/$USER_ID/api-keys \
+  -H "Content-Type: application/json" \
+  -H "X-Admin-API-Key: $ADMIN_API_KEY" \
+  -d '{
+    "name": "生产环境 Key"
+  }'
+# 返回的 key 仅此一次可见，请妥善保存
+
+# 使用 API Key 调用 Chat API
+API_KEY="<返回的完整API Key>"
+curl -X POST http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $API_KEY" \
+  -d '{
+    "model": "openai-main/gpt-4o",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+
+# 查询使用统计
+curl "http://localhost:8080/v1/usage?user_id=$USER_ID" \
+  -H "X-Admin-API-Key: $ADMIN_API_KEY"
+```
+
+### 5. 管理 Provider
+
+```bash
 # 创建 Provider（带 Fallback 配置）
 curl -X POST http://localhost:8080/api/v1/providers \
   -H "Content-Type: application/json" \
+  -H "X-Admin-API-Key: $ADMIN_API_KEY" \
   -d '{
     "name": "openai-main",
     "type": "openai",
@@ -48,10 +94,12 @@ curl -X POST http://localhost:8080/api/v1/providers \
   }'
 
 # 查询 Provider 列表
-curl http://localhost:8080/api/v1/providers
+curl http://localhost:8080/api/v1/providers \
+  -H "X-Admin-API-Key: $ADMIN_API_KEY"
 
 # 重载 Provider
-curl -X POST http://localhost:8080/api/v1/admin/providers/reload
+curl -X POST http://localhost:8080/api/v1/providers/reload \
+  -H "X-Admin-API-Key: $ADMIN_API_KEY"
 ```
 
 ## Docker 部署
@@ -86,8 +134,7 @@ docker-compose down
 |------|------|--------|
 | DATABASE_URL | PostgreSQL 连接字符串 | - |
 | PORT | HTTP 服务端口 | 8080 |
-| ADMIN_API_KEY | 管理员 API Key（可选） | - |
-| API_KEYS | API Key 白名单（逗号分隔） | - |
+| ADMIN_API_KEY | 管理员 API Key（必需，用于管理接口） | - |
 | LOG_LEVEL | 日志级别（debug/info/warn/error） | info |
 
 ## Provider 配置
@@ -169,7 +216,37 @@ migrate -path migrations -database "$DATABASE_URL" up
 # 回滚代码
 git checkout <previous-commit>
 
-# 回滚数据库迁移
+# 回滚数据库迁移（按相反顺序）
+psql $DATABASE_URL -f migrations/000005_create_usage_records.down.sql
+psql $DATABASE_URL -f migrations/000004_create_api_keys.down.sql
+psql $DATABASE_URL -f migrations/000003_create_users.down.sql
 psql $DATABASE_URL -f migrations/000002_add_fallback_models.down.sql
 psql $DATABASE_URL -f migrations/000001_create_providers.down.sql
 ```
+
+## API 接口说明
+
+### 管理接口（需要 ADMIN_API_KEY）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/v1/users` | 创建用户 |
+| GET | `/v1/users/:id` | 获取用户信息 |
+| POST | `/v1/users/:id/api-keys` | 为用户创建 API Key |
+| GET | `/v1/users/:id/api-keys` | 获取用户的 API Key 列表 |
+| DELETE | `/v1/users/:id/api-keys/:key_id` | 撤销 API Key |
+| GET | `/v1/usage` | 查询使用统计 |
+| POST | `/api/v1/providers` | 创建 Provider |
+| GET | `/api/v1/providers` | 查询 Provider 列表 |
+| POST | `/api/v1/providers/reload` | 重载 Provider |
+
+### Chat API（需要用户 API Key）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/v1/chat/completions` | Chat Completions（OpenAI 兼容） |
+
+### API Key 格式
+
+- **管理员 API Key**：通过 `X-Admin-API-Key` Header 传递，用于管理接口
+- **用户 API Key**：格式为 `sk-courier-<32位随机字符>`，通过 `Authorization: Bearer <key>` 传递

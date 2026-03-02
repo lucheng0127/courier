@@ -2,36 +2,16 @@ package middleware
 
 import (
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lucheng0127/courier/internal/service"
 )
 
-var validAPIKeys map[string]bool
-
-func init() {
-	validAPIKeys = make(map[string]bool)
-
-	// 从环境变量读取 API Key 白名单（逗号分隔）
-	if keys := os.Getenv("API_KEYS"); keys != "" {
-		keyList := strings.Split(keys, ",")
-		for _, key := range keyList {
-			if trimmed := strings.TrimSpace(key); trimmed != "" {
-				validAPIKeys[trimmed] = true
-			}
-		}
-	}
-
-	// 如果未配置白名单，则允许所有 sk- 开头的 Key（开发模式）
-	if len(validAPIKeys) == 0 {
-		// 开发模式：任何 sk- 开头的 Key 都通过
-	}
-}
-
 // APIKeyAuth API Key 鉴权中间件
-func APIKeyAuth() gin.HandlerFunc {
+func APIKeyAuth(authService *service.AuthService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
+		// 从 Authorization Header 提取 Bearer token
 		authHeader := ctx.GetHeader("Authorization")
 		if authHeader == "" {
 			ctx.JSON(http.StatusUnauthorized, gin.H{
@@ -59,8 +39,9 @@ func APIKeyAuth() gin.HandlerFunc {
 
 		apiKey := parts[1]
 
-		// 验证 API Key
-		if !isValidAPIKey(apiKey) {
+		// 从数据库验证 API Key
+		keyRecord, err := authService.ValidateAPIKey(ctx, apiKey)
+		if err != nil {
 			ctx.JSON(http.StatusUnauthorized, gin.H{
 				"error": gin.H{
 					"message": "Invalid API key",
@@ -71,24 +52,41 @@ func APIKeyAuth() gin.HandlerFunc {
 			return
 		}
 
-		// 将 API Key 存储在上下文中（脱敏后）
-		maskedKey := maskAPIKey(apiKey)
-		ctx.Set("api_key", apiKey)
-		ctx.Set("api_key_masked", maskedKey)
+		// 获取关联用户信息
+		user, err := authService.GetUserByID(ctx, keyRecord.UserID)
+		if err != nil {
+			ctx.JSON(http.StatusUnauthorized, gin.H{
+				"error": gin.H{
+					"message": "User not found",
+					"type":    "invalid_request_error",
+				},
+			})
+			ctx.Abort()
+			return
+		}
+
+		if user.Status != "active" {
+			ctx.JSON(http.StatusForbidden, gin.H{
+				"error": gin.H{
+					"message": "User account is disabled",
+					"type":    "permission_error",
+				},
+			})
+			ctx.Abort()
+			return
+		}
+
+		// 注入到 Context
+		ctx.Set("user_id", user.ID)
+		ctx.Set("user_email", user.Email)
+		ctx.Set("api_key_id", keyRecord.ID)
+		ctx.Set("api_key_masked", maskAPIKey(apiKey))
+
+		// 异步更新 last_used_at
+		go authService.UpdateKeyLastUsed(ctx, keyRecord.ID)
 
 		ctx.Next()
 	}
-}
-
-// isValidAPIKey 验证 API Key 是否有效
-func isValidAPIKey(key string) bool {
-	// 如果配置了白名单，严格验证
-	if len(validAPIKeys) > 0 {
-		return validAPIKeys[key]
-	}
-
-	// 开发模式：任何 sk- 开头的 Key 都通过
-	return strings.HasPrefix(key, "sk-")
 }
 
 // maskAPIKey 脱敏 API Key
