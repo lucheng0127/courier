@@ -28,6 +28,30 @@ func NewClient(baseURL, apiKey string, timeout int) *Client {
 	}
 }
 
+// buildChatURL 智能构建聊天 API URL
+// 避免路径重复，支持多种 baseURL 格式：
+// - https://api.openai.com -> https://api.openai.com/v1/chat/completions
+// - https://api.openai.com/v1 -> https://api.openai.com/v1/chat/completions
+// - https://api.openai.com/v1/chat/completions -> https://api.openai.com/v1/chat/completions
+// - https://dashscope.aliyuncs.com/compatible-mode/v1 -> https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+func buildChatURL(baseURL string) string {
+	// 去除末尾的斜杠
+	baseURL = strings.TrimSuffix(baseURL, "/")
+
+	// 检查是否已经包含完整路径
+	if strings.HasSuffix(baseURL, "/chat/completions") {
+		return baseURL
+	}
+
+	// 检查是否以 /v1 结尾，如果是则直接追加 /chat/completions
+	if strings.HasSuffix(baseURL, "/v1") {
+		return baseURL + "/chat/completions"
+	}
+
+	// 默认追加 /v1/chat/completions
+	return baseURL + "/v1/chat/completions"
+}
+
 // ChatRequest OpenAI API 请求格式
 type ChatRequest struct {
 	Model       string              `json:"model"`
@@ -115,7 +139,7 @@ func (c *Client) DoChatRequest(ctx context.Context, req *ChatRequest) (*ChatResp
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/v1/chat/completions", strings.NewReader(string(body)))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", buildChatURL(c.baseURL), strings.NewReader(string(body)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -168,7 +192,7 @@ func (c *Client) DoChatStreamRequest(ctx context.Context, req *ChatRequest, resp
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/v1/chat/completions", strings.NewReader(string(body)))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", buildChatURL(c.baseURL), strings.NewReader(string(body)))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
