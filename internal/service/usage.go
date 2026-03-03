@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/lucheng0127/courier/internal/logger"
 	"github.com/lucheng0127/courier/internal/model"
 	"github.com/lucheng0127/courier/internal/repository"
@@ -64,11 +66,10 @@ func (s *UsageService) processRecords() {
 		// 批量写入
 		for _, record := range batch {
 			if err := s.usageRepo.CreateUsageRecord(ctx, record); err != nil {
-				logger.Error("Failed to create usage record", map[string]any{
-					"request_id": record.RequestID,
-					"user_id":    record.UserID,
-					"error":      err.Error(),
-				})
+				logger.L.Error("Failed to create usage record",
+					zap.String("request_id", record.RequestID),
+					zap.Int64("user_id", record.UserID),
+					zap.Error(err))
 			}
 		}
 		batch = batch[:0]

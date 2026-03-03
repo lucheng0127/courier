@@ -4,20 +4,25 @@ import "time"
 
 // UsageRecord 使用记录模型
 type UsageRecord struct {
-	ID               int64     `json:"id" db:"id"`
-	UserID           int64     `json:"user_id" db:"user_id"`
-	APIKeyID         int64     `json:"api_key_id" db:"api_key_id"`
-	RequestID        string    `json:"request_id" db:"request_id"`
-	TraceID          string    `json:"trace_id" db:"trace_id"`
-	Model            string    `json:"model" db:"model"`
-	ProviderName     string    `json:"provider_name" db:"provider_name"`
+	ID               int64     `json:"id" db:"id" gorm:"primaryKey"`
+	UserID           int64     `json:"user_id" db:"user_id" gorm:"index"`
+	APIKeyID         int64     `json:"api_key_id" db:"api_key_id" gorm:"index"`
+	RequestID        string    `json:"request_id" db:"request_id" gorm:"index"`
+	TraceID          string    `json:"trace_id" db:"trace_id" gorm:"index"`
+	Model            string    `json:"model" db:"model" gorm:"index"`
+	ProviderName     string    `json:"provider_name" db:"provider_name" gorm:"index"`
 	PromptTokens     int       `json:"prompt_tokens" db:"prompt_tokens"`
 	CompletionTokens int       `json:"completion_tokens" db:"completion_tokens"`
 	TotalTokens      int       `json:"total_tokens" db:"total_tokens"`
 	LatencyMs        int64     `json:"latency_ms" db:"latency_ms"`
-	Status           string    `json:"status" db:"status"` // success, error
+	Status           string    `json:"status" db:"status" gorm:"index"` // success, error
 	ErrorType        string    `json:"error_type,omitempty" db:"error_type"`
-	Timestamp        time.Time `json:"timestamp" db:"timestamp"`
+	Timestamp        time.Time `json:"timestamp" db:"timestamp" gorm:"autoCreateTime"`
+}
+
+// TableName 指定表名
+func (UsageRecord) TableName() string {
+	return "usage_records"
 }
 
 // UsageStatsRequest 使用统计查询请求

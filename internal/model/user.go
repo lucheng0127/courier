@@ -4,27 +4,37 @@ import "time"
 
 // User 用户模型
 type User struct {
-	ID           int64     `json:"id" db:"id"`
-	Name         string    `json:"name" db:"name"`
-	Email        string    `json:"email" db:"email"`
-	PasswordHash string    `json:"-" db:"password_hash"` // 密码哈希，不输出到 JSON
-	Role         string    `json:"role" db:"role"`       // user, admin
-	Status       string    `json:"status" db:"status"`   // active, disabled
-	CreatedAt    time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
+	ID           int64     `json:"id" db:"id" gorm:"primaryKey"`
+	Name         string    `json:"name" db:"name" gorm:"not null"`
+	Email        string    `json:"email" db:"email" gorm:"uniqueIndex;not null"`
+	PasswordHash string    `json:"-" db:"password_hash" gorm:"not null"` // 密码哈希，不输出到 JSON
+	Role         string    `json:"role" db:"role" gorm:"index;default:'user'"`       // user, admin
+	Status       string    `json:"status" db:"status" gorm:"index;default:'active'"`   // active, disabled
+	CreatedAt    time.Time `json:"created_at" db:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt    time.Time `json:"updated_at" db:"updated_at" gorm:"autoUpdateTime"`
+}
+
+// TableName 指定表名
+func (User) TableName() string {
+	return "users"
 }
 
 // APIKey API Key 模型
 type APIKey struct {
-	ID         int64      `json:"id" db:"id"`
-	UserID     int64      `json:"user_id" db:"user_id"`
-	KeyHash    string     `json:"-" db:"key_hash"`    // SHA256 哈希存储，不输出到 JSON
-	KeyPrefix  string     `json:"key_prefix" db:"key_prefix"` // 前8位用于识别
-	Name       string     `json:"name" db:"name"`      // 用户定义的名称
-	Status     string     `json:"status" db:"status"`  // active, disabled, revoked
+	ID         int64      `json:"id" db:"id" gorm:"primaryKey"`
+	UserID     int64      `json:"user_id" db:"user_id" gorm:"index;not null"`
+	KeyHash    string     `json:"-" db:"key_hash" gorm:"not null"`    // SHA256 哈希存储，不输出到 JSON
+	KeyPrefix  string     `json:"key_prefix" db:"key_prefix" gorm:"not null"` // 前8位用于识别
+	Name       string     `json:"name" db:"name" gorm:"not null"`      // 用户定义的名称
+	Status     string     `json:"status" db:"status" gorm:"index;default:'active'"`  // active, disabled, revoked
 	LastUsedAt *time.Time `json:"last_used_at,omitempty" db:"last_used_at"`
 	ExpiresAt  *time.Time `json:"expires_at,omitempty" db:"expires_at"`
-	CreatedAt  time.Time  `json:"created_at" db:"created_at"`
+	CreatedAt  time.Time  `json:"created_at" db:"created_at" gorm:"autoCreateTime"`
+}
+
+// TableName 指定表名
+func (APIKey) TableName() string {
+	return "api_keys"
 }
 
 // CreateUserRequest 创建用户请求

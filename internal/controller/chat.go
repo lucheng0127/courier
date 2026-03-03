@@ -9,6 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
+
 	"github.com/lucheng0127/courier/internal/adapter"
 	"github.com/lucheng0127/courier/internal/logger"
 	"github.com/lucheng0127/courier/internal/middleware"
@@ -46,10 +48,9 @@ func (c *ChatController) ChatCompletions(ctx *gin.Context) {
 	// 解析请求
 	var req model.ChatRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		logger.Warn("Invalid request format", map[string]any{
-			"trace_id": traceID,
-			"error":    err.Error(),
-		})
+		logger.L.Warn("Invalid request format",
+			zap.String("trace_id", traceID),
+			zap.Error(err))
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"error": gin.H{
 				"message": err.Error(),
@@ -185,10 +186,9 @@ func (c *ChatController) getFallbackModels(ctx *gin.Context, modelInfo *service.
 func (c *ChatController) handleModelError(ctx *gin.Context, err error, traceID string) {
 	switch e := err.(type) {
 	case *service.ModelFormatError:
-		logger.Warn("Model format error", map[string]any{
-			"trace_id": traceID,
-			"error":    e.Error(),
-		})
+		logger.L.Warn("Model format error",
+			zap.String("trace_id", traceID),
+			zap.Error(e))
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"error": gin.H{
 				"message": e.Error(),
@@ -196,10 +196,9 @@ func (c *ChatController) handleModelError(ctx *gin.Context, err error, traceID s
 			},
 		})
 	case *service.ProviderNotFoundError:
-		logger.Warn("Provider not found", map[string]any{
-			"trace_id":      traceID,
-			"provider_name": e.ProviderName,
-		})
+		logger.L.Warn("Provider not found",
+			zap.String("trace_id", traceID),
+			zap.String("provider_name", e.ProviderName))
 		ctx.JSON(http.StatusNotFound, gin.H{
 			"error": gin.H{
 				"message": e.Error(),
@@ -207,10 +206,9 @@ func (c *ChatController) handleModelError(ctx *gin.Context, err error, traceID s
 			},
 		})
 	default:
-		logger.Error("Failed to resolve model", map[string]any{
-			"trace_id": traceID,
-			"error":    err.Error(),
-		})
+		logger.L.Error("Failed to resolve model",
+			zap.String("trace_id", traceID),
+			zap.Error(err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"error": gin.H{
 				"message": "Failed to resolve model",
@@ -235,11 +233,10 @@ func (c *ChatController) handleProviderError(ctx *gin.Context, err error, result
 			})
 		}
 
-		logger.Error("All models failed", map[string]any{
-			"trace_id":         traceID,
-			"attempt_count":    len(result.AttemptDetails),
-			"attempt_details":  result.AttemptDetails,
-		})
+		logger.L.Error("All models failed",
+			zap.String("trace_id", traceID),
+			zap.Int("attempt_count", len(result.AttemptDetails)),
+			zap.Any("attempt_details", result.AttemptDetails))
 
 		ctx.JSON(http.StatusServiceUnavailable, gin.H{
 			"error": gin.H{
@@ -252,10 +249,9 @@ func (c *ChatController) handleProviderError(ctx *gin.Context, err error, result
 	}
 
 	// 其他错误
-	logger.Error("Provider error", map[string]any{
-		"trace_id": traceID,
-		"error":    err.Error(),
-	})
+	logger.L.Error("Provider error",
+		zap.String("trace_id", traceID),
+		zap.Error(err))
 
 	ctx.JSON(http.StatusInternalServerError, gin.H{
 		"error": gin.H{
@@ -443,25 +439,23 @@ func (c *ChatController) logRequestWithRetry(ctx *gin.Context, requestID string,
 
 	// 使用结构化日志
 	if status == "success" {
-		logger.Info("Chat request completed", map[string]any{
-			"trace_id":        log.TraceID,
-			"request_id":      log.RequestID,
-			"model":           log.Model,
-			"provider":        log.ProviderName,
-			"fallback_count":  log.FallbackCount,
-			"final_model":     log.FinalModelName,
-			"latency_ms":      log.LatencyMs,
-			"status":          log.Status,
-		})
+		logger.L.Info("Chat request completed",
+			zap.String("trace_id", log.TraceID),
+			zap.String("request_id", log.RequestID),
+			zap.String("model", log.Model),
+			zap.String("provider", log.ProviderName),
+			zap.Int("fallback_count", log.FallbackCount),
+			zap.String("final_model", log.FinalModelName),
+			zap.Int64("latency_ms", log.LatencyMs),
+			zap.String("status", log.Status))
 	} else {
-		logger.Error("Chat request failed", map[string]any{
-			"trace_id":        log.TraceID,
-			"request_id":      log.RequestID,
-			"model":           log.Model,
-			"provider":        log.ProviderName,
-			"attempt_count":   len(log.AttemptDetails),
-			"error":           log.Error,
-		})
+		logger.L.Error("Chat request failed",
+			zap.String("trace_id", log.TraceID),
+			zap.String("request_id", log.RequestID),
+			zap.String("model", log.Model),
+			zap.String("provider", log.ProviderName),
+			zap.Int("attempt_count", len(log.AttemptDetails)),
+			zap.String("error", log.Error))
 	}
 
 	// 如果有用户信息，记录使用量到数据库
@@ -483,11 +477,10 @@ func (c *ChatController) logRequestWithRetry(ctx *gin.Context, requestID string,
 
 		// 异步记录使用量（使用独立 context）
 		if err := c.usageService.RecordUsage(context.Background(), record); err != nil {
-			logger.Error("Failed to record usage", map[string]any{
-				"request_id": requestID,
-				"user_id":    userID,
-				"error":      err.Error(),
-			})
+			logger.L.Error("Failed to record usage",
+				zap.String("request_id", requestID),
+				zap.Any("user_id", userID),
+				zap.Error(err))
 		}
 	}
 }
