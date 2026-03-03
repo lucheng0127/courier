@@ -4,7 +4,7 @@
 
 定义基于 JWT 的身份认证机制，用于除 `/chat/completions` 外的所有管理接口。
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: 管理接口 JWT 鉴权
 

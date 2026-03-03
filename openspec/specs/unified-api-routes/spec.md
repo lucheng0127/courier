@@ -1,11 +1,8 @@
-# unified-api-routes Specification Delta
+# unified-api-routes Specification
 
 ## Purpose
-
-统一所有 API 接口的路径前缀和路由注册风格。
-
-## MODIFIED Requirements
-
+TBD - created by archiving change unify-api-and-jwt-auth. Update Purpose after archive.
+## Requirements
 ### Requirement: API 路径前缀规范
 
 除 `/chat/completions` 外，所有管理接口 SHALL 使用 `/api/v1` 作为路径前缀。
@@ -155,8 +152,6 @@ main.go 中的路由注册 SHALL 遵循统一的组织方式。
   5. API Key 鉴权中间件（Chat API）
   6. TraceID 中间件（Chat API）
 
-## ADDED Requirements
-
 ### Requirement: API 版本管理
 
 系统 SHALL 支持通过 URL 路径进行版本控制。
@@ -183,29 +178,3 @@ main.go 中的路由注册 SHALL 遵循统一的组织方式。
   }
   ```
 
-## REMOVED Requirements
-
-### Requirement: 移除 /v1 管理接口
-
-原有的 `/v1/*` 管理接口路径 SHALL 被移除。
-
-#### Scenario: 旧路径不再可用
-
-- **GIVEN** 系统已完成迁移
-- **WHEN** 访问旧的管理接口路径
-  - `/v1/users`
-  - `/v1/usage`
-- **THEN** 返回 404 状态码
-- **AND** 响应体包含错误信息：
-  - `message`: "API endpoint not found"
-  - `type`: "invalid_request_error"
-
-### Requirement: 移除 main.go 硬编码路由
-
-原有的在 main.go 中硬编码注册路由的方式 SHALL 被移除。
-
-#### Scenario: 不再有直接路由注册
-
-- **WHEN** 查看 main.go
-- **THEN** 不出现类似 `userGroup.POST("", userCtrl.CreateUser)` 的直接路由注册
-- **AND** 所有路由注册通过 Controller 的 `RegisterRoutes` 方法完成
