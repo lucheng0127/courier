@@ -12,13 +12,15 @@
 - **使用统计**：记录和查询 API 使用情况
 - **JWT 认证**：安全的 Token 认证机制
 - **链路追踪**：每个请求唯一 TraceID，方便问题排查
+- **自动数据库迁移**：使用 GORM AutoMigrate 自动管理数据库 schema
+- **结构化日志**：基于 uber-go/zap 的结构化日志
 
 ## 快速开始
 
 ### 使用 Docker Compose
 
 ```bash
-# 启动服务
+# 启动服务（会自动执行数据库迁移）
 docker-compose up -d
 
 # 查看日志
@@ -33,21 +35,9 @@ docker-compose logs -f courier
 docker-compose up -d postgres
 ```
 
-#### 2. 执行数据库迁移
+#### 2. 运行服务
 
-```bash
-export DATABASE_URL="host=localhost port=5432 user=courier password=courier dbname=courier sslmode=disable"
-
-psql $DATABASE_URL -f migrations/000001_create_providers.up.sql
-psql $DATABASE_URL -f migrations/000002_add_fallback_models.up.sql
-psql $DATABASE_URL -f migrations/000003_create_users.up.sql
-psql $DATABASE_URL -f migrations/000004_create_api_keys.up.sql
-psql $DATABASE_URL -f migrations/000005_create_usage_records.up.sql
-psql $DATABASE_URL -f migrations/000006_add_user_role.up.sql
-psql $DATABASE_URL -f migrations/000007_add_password_hash.up.sql
-```
-
-#### 3. 运行服务
+系统启动时会自动执行数据库迁移（GORM AutoMigrate）。
 
 ```bash
 export DATABASE_URL="host=localhost port=5432 user=courier password=courier dbname=courier sslmode=disable"
@@ -71,7 +61,9 @@ go run cmd/server/main.go
 | `JWT_REFRESH_TOKEN_EXPIRES_IN` | Refresh Token 有效期 | 168h | - |
 | `INITIAL_ADMIN_EMAIL` | 初始管理员邮箱 | - | - |
 | `INITIAL_ADMIN_PASSWORD` | 初始管理员密码 | - | - |
-| `LOG_LEVEL` | 日志级别 | info | - |
+| `LOG_LEVEL` | 日志级别（debug/info/warn/error） | info | - |
+| `ENV` | 运行环境（development/production） | production | - |
+| `AUTO_MIGRATE` | 是否自动执行数据库迁移 | true | - |
 
 ## 使用示例
 
@@ -177,13 +169,9 @@ curl -X POST http://localhost:8080/v1/chat/completions \
 
 ## 文档
 
-- [完整 API 文档](./docs/api.md)
-- [部署文档](./docs/deployment.md)
-- [Provider 配置指南](./docs/provider-config.md)
-- [认证与鉴权](./docs/authentication.md)
-- [API Key 管理](./docs/api-key-management.md)
-- [Chat API 使用](./docs/chat-api.md)
-- [Fallback 最佳实践](./docs/fallback-best-practices.md)
+- [API 完整文档](./docs/api.md) - 所有 API 接口的详细说明
+- [部署文档](./docs/deployment.md) - 本地开发、Docker 部署、生产环境配置
+- [Provider 和 Fallback 配置](./docs/provider-and-fallback.md) - Provider 配置和 Fallback 最佳实践
 
 ## 架构
 
@@ -226,15 +214,50 @@ courier/
 │   │   └── vllm/
 │   ├── controller/              # HTTP 控制器
 │   ├── middleware/              # 中间件
+│   ├── migrate/                 # 数据库自动迁移
 │   ├── model/                   # 数据模型
+│   ├── logger/                  # 结构化日志
 │   ├── repository/              # 数据访问层
 │   ├── service/                 # 业务逻辑层
 │   └── bootstrap/               # 服务初始化
-├── migrations/                  # 数据库迁移文件
 ├── docs/                        # 文档
 ├── openspec/                    # OpenSpec 变更管理
 └── go.mod
 ```
+
+## 数据库迁移
+
+系统使用 GORM AutoMigrate 进行自动数据库迁移：
+
+- **启动时自动执行**：服务启动时自动检查并执行迁移
+- **Schema 版本跟踪**：使用 `schema_migrations` 表记录版本和 hash
+- **变更检测**：检测 struct 定义变化并自动同步
+- **环境变量控制**：可通过 `AUTO_MIGRATE=false` 禁用自动迁移
+
+数据库表结构由 Go struct 定义，位于 `internal/model/` 目录：
+- `provider.go` - Provider 表
+- `user.go` - User 和 APIKey 表
+- `usage.go` - UsageRecord 表
+
+## 日志
+
+系统使用 uber-go/zap 结构化日志：
+
+- **开发环境**（ENV=development）：彩色 console 格式，便于调试
+- **生产环境**（ENV=production）：JSON 格式，便于日志聚合
+
+设置日志级别：
+```bash
+export LOG_LEVEL=debug  # debug/info/warn/error
+```
+
+每个 Chat 请求都会记录详细日志，包含：
+- `trace_id` - 链路追踪 ID
+- `fallback_count` - Fallback 次数
+- `final_model` - 最终使用的模型
+- `prompt_tokens`、`completion_tokens`、`total_tokens`
+- `latency_ms` - 请求耗时
+- `status` - 状态（success/error）
 
 ## 开发
 
@@ -274,6 +297,9 @@ docker-compose up -d
 
 # 查看日志
 docker-compose logs -f courier
+
+# 完全清理（包括数据库卷）
+docker-compose down -v
 ```
 
 ### 生产环境建议
@@ -285,7 +311,7 @@ docker-compose logs -f courier
 
 2. **性能**
    - 配置数据库连接池
-   - 启用日志聚合（如 ELK）
+   - 启用日志聚合（如 ELK、Loki）
    - 监控 Provider 调用延迟
 
 3. **高可用**
