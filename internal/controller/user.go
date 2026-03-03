@@ -5,53 +5,68 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lucheng0127/courier/internal/middleware"
 	"github.com/lucheng0127/courier/internal/model"
 	"github.com/lucheng0127/courier/internal/service"
 )
 
 // UserController 用户管理控制器
 type UserController struct {
-	authService *service.AuthService
+	authSvc *service.AuthService
 }
 
 // NewUserController 创建 User Controller
-func NewUserController(authService *service.AuthService) *UserController {
+func NewUserController(authSvc *service.AuthService) *UserController {
 	return &UserController{
-		authService: authService,
+		authSvc: authSvc,
 	}
 }
 
-// CreateUser 创建用户
-// POST /v1/users
+// RegisterRoutes 注册路由
+func (c *UserController) RegisterRoutes(r *gin.RouterGroup) {
+	users := r.Group("/users")
+	{
+		// 用户管理（仅管理员）
+		users.POST("", c.CreateUser)
+		users.GET("", c.ListUsers)
+		users.PUT("/:id", c.UpdateUser)
+		users.DELETE("/:id", c.DeleteUser)
+		users.PATCH("/:id/status", c.UpdateUserStatus)
+
+		// 获取用户信息（普通用户可获取自己的，管理员可获取任何人的）
+		users.GET("/:id", c.GetUser)
+
+		// API Key 管理（普通用户可管理自己的，管理员可管理任何人的）
+		users.POST("/:id/api-keys", c.CreateAPIKey)
+		users.GET("/:id/api-keys", c.ListAPIKeys)
+		users.DELETE("/:id/api-keys/:key_id", c.RevokeAPIKey)
+	}
+}
+
+// CreateUser 创建用户（仅管理员）
+// POST /api/v1/users
 func (c *UserController) CreateUser(ctx *gin.Context) {
 	var req model.CreateUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": gin.H{
-				"message": err.Error(),
-				"type":    "invalid_request_error",
-			},
+			"message": err.Error(),
+			"type":    "invalid_request_error",
 		})
 		return
 	}
 
-	user, err := c.authService.CreateUser(ctx, &req)
+	user, err := c.authSvc.CreateUser(ctx, &req)
 	if err != nil {
-		// 检查是否是邮箱重复错误
 		if err.Error() == "email already exists" {
 			ctx.JSON(http.StatusConflict, gin.H{
-				"error": gin.H{
-					"message": "Email already exists",
-					"type":    "invalid_request_error",
-				},
+				"message": "Email already exists",
+				"type":    "invalid_request_error",
 			})
 			return
 		}
 		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error": gin.H{
-				"message": "Failed to create user",
-				"type":    "api_error",
-			},
+			"message": "Failed to create user",
+			"type":    "api_error",
 		})
 		return
 	}
@@ -60,27 +75,35 @@ func (c *UserController) CreateUser(ctx *gin.Context) {
 }
 
 // GetUser 获取用户信息
-// GET /v1/users/:id
+// GET /api/v1/users/:id
+// 权限：管理员可获取任何用户，普通用户只能获取自己
 func (c *UserController) GetUser(ctx *gin.Context) {
 	idStr := ctx.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	targetID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": gin.H{
-				"message": "Invalid user ID",
-				"type":    "invalid_request_error",
-			},
+			"message": "Invalid user ID",
+			"type":    "invalid_request_error",
 		})
 		return
 	}
 
-	user, err := c.authService.GetUserByID(ctx, id)
+	// 权限检查：普通用户只能获取自己的信息
+	userID, hasAuth := middleware.GetUserID(ctx)
+	userRole, _ := middleware.GetUserRole(ctx)
+	if hasAuth && userRole != "admin" && userID != targetID {
+		ctx.JSON(http.StatusForbidden, gin.H{
+			"message": "Permission denied",
+			"type":    "permission_error",
+		})
+		return
+	}
+
+	user, err := c.authSvc.GetUserByID(ctx, targetID)
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{
-			"error": gin.H{
-				"message": "User not found",
-				"type":    "invalid_request_error",
-			},
+			"message": "User not found",
+			"type":    "invalid_request_error",
 		})
 		return
 	}
@@ -89,16 +112,26 @@ func (c *UserController) GetUser(ctx *gin.Context) {
 }
 
 // CreateAPIKey 为用户创建 API Key
-// POST /v1/users/:id/api-keys
+// POST /api/v1/users/:id/api-keys
+// 权限：管理员可创建任何用户的，普通用户只能创建自己的
 func (c *UserController) CreateAPIKey(ctx *gin.Context) {
 	idStr := ctx.Param("id")
-	userID, err := strconv.ParseInt(idStr, 10, 64)
+	targetID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": gin.H{
-				"message": "Invalid user ID",
-				"type":    "invalid_request_error",
-			},
+			"message": "Invalid user ID",
+			"type":    "invalid_request_error",
+		})
+		return
+	}
+
+	// 权限检查：普通用户只能为自己创建 API Key
+	userID, hasAuth := middleware.GetUserID(ctx)
+	userRole, _ := middleware.GetUserRole(ctx)
+	if hasAuth && userRole != "admin" && userID != targetID {
+		ctx.JSON(http.StatusForbidden, gin.H{
+			"message": "Permission denied",
+			"type":    "permission_error",
 		})
 		return
 	}
@@ -106,40 +139,31 @@ func (c *UserController) CreateAPIKey(ctx *gin.Context) {
 	var req model.CreateAPIKeyRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": gin.H{
-				"message": err.Error(),
-				"type":    "invalid_request_error",
-			},
+			"message": err.Error(),
+			"type":    "invalid_request_error",
 		})
 		return
 	}
 
-	response, err := c.authService.CreateAPIKey(ctx, userID, &req)
+	response, err := c.authSvc.CreateAPIKey(ctx, targetID, &req)
 	if err != nil {
-		// 检查错误类型
 		if err.Error() == "user not found" {
 			ctx.JSON(http.StatusNotFound, gin.H{
-				"error": gin.H{
-					"message": "User not found",
-					"type":    "invalid_request_error",
-				},
+				"message": "User not found",
+				"type":    "invalid_request_error",
 			})
 			return
 		}
 		if err.Error() == "user is not active" {
 			ctx.JSON(http.StatusBadRequest, gin.H{
-				"error": gin.H{
-					"message": "User is not active",
-					"type":    "invalid_request_error",
-				},
+				"message": "User is not active",
+				"type":    "invalid_request_error",
 			})
 			return
 		}
 		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error": gin.H{
-				"message": "Failed to create API key",
-				"type":    "api_error",
-			},
+			"message": "Failed to create API key",
+			"type":    "api_error",
 		})
 		return
 	}
@@ -148,36 +172,42 @@ func (c *UserController) CreateAPIKey(ctx *gin.Context) {
 }
 
 // ListAPIKeys 获取用户的 API Key 列表
-// GET /v1/users/:id/api-keys
+// GET /api/v1/users/:id/api-keys
+// 权限：管理员可查看任何用户的，普通用户只能查看自己的
 func (c *UserController) ListAPIKeys(ctx *gin.Context) {
 	idStr := ctx.Param("id")
-	userID, err := strconv.ParseInt(idStr, 10, 64)
+	targetID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": gin.H{
-				"message": "Invalid user ID",
-				"type":    "invalid_request_error",
-			},
+			"message": "Invalid user ID",
+			"type":    "invalid_request_error",
 		})
 		return
 	}
 
-	keys, err := c.authService.ListAPIKeys(ctx, userID)
+	// 权限检查：普通用户只能查看自己的 API Key
+	userID, hasAuth := middleware.GetUserID(ctx)
+	userRole, _ := middleware.GetUserRole(ctx)
+	if hasAuth && userRole != "admin" && userID != targetID {
+		ctx.JSON(http.StatusForbidden, gin.H{
+			"message": "Permission denied",
+			"type":    "permission_error",
+		})
+		return
+	}
+
+	keys, err := c.authSvc.ListAPIKeys(ctx, targetID)
 	if err != nil {
 		if err.Error() == "user not found" {
 			ctx.JSON(http.StatusNotFound, gin.H{
-				"error": gin.H{
-					"message": "User not found",
-					"type":    "invalid_request_error",
-				},
+				"message": "User not found",
+				"type":    "invalid_request_error",
 			})
 			return
 		}
 		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error": gin.H{
-				"message": "Failed to list API keys",
-				"type":    "api_error",
-			},
+			"message": "Failed to list API keys",
+			"type":    "api_error",
 		})
 		return
 	}
@@ -202,16 +232,26 @@ func (c *UserController) ListAPIKeys(ctx *gin.Context) {
 }
 
 // RevokeAPIKey 撤销 API Key
-// DELETE /v1/users/:id/api-keys/:key_id
+// DELETE /api/v1/users/:id/api-keys/:key_id
+// 权限：管理员可撤销任何用户的，普通用户只能撤销自己的
 func (c *UserController) RevokeAPIKey(ctx *gin.Context) {
 	idStr := ctx.Param("id")
-	userID, err := strconv.ParseInt(idStr, 10, 64)
+	targetID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": gin.H{
-				"message": "Invalid user ID",
-				"type":    "invalid_request_error",
-			},
+			"message": "Invalid user ID",
+			"type":    "invalid_request_error",
+		})
+		return
+	}
+
+	// 权限检查：普通用户只能撤销自己的 API Key
+	userID, hasAuth := middleware.GetUserID(ctx)
+	userRole, _ := middleware.GetUserRole(ctx)
+	if hasAuth && userRole != "admin" && userID != targetID {
+		ctx.JSON(http.StatusForbidden, gin.H{
+			"message": "Permission denied",
+			"type":    "permission_error",
 		})
 		return
 	}
@@ -220,41 +260,66 @@ func (c *UserController) RevokeAPIKey(ctx *gin.Context) {
 	keyID, err := strconv.ParseInt(keyIDStr, 10, 64)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": gin.H{
-				"message": "Invalid API key ID",
-				"type":    "invalid_request_error",
-			},
+			"message": "Invalid API key ID",
+			"type":    "invalid_request_error",
 		})
 		return
 	}
 
-	if err := c.authService.RevokeAPIKey(ctx, userID, keyID); err != nil {
+	if err := c.authSvc.RevokeAPIKey(ctx, targetID, keyID); err != nil {
 		if err.Error() == "api key not found" {
 			ctx.JSON(http.StatusNotFound, gin.H{
-				"error": gin.H{
-					"message": "API key not found",
-					"type":    "invalid_request_error",
-				},
+				"message": "API key not found",
+				"type":    "invalid_request_error",
 			})
 			return
 		}
 		if err.Error() == "api key does not belong to user" {
 			ctx.JSON(http.StatusForbidden, gin.H{
-				"error": gin.H{
-					"message": "API key does not belong to user",
-					"type":    "permission_error",
-				},
+				"message": "API key does not belong to user",
+				"type":    "permission_error",
 			})
 			return
 		}
 		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error": gin.H{
-				"message": "Failed to revoke API key",
-				"type":    "api_error",
-			},
+			"message": "Failed to revoke API key",
+			"type":    "api_error",
 		})
 		return
 	}
 
 	ctx.Status(http.StatusNoContent)
+}
+
+// ListUsers 列出所有用户（仅管理员）
+// GET /api/v1/users
+func (c *UserController) ListUsers(ctx *gin.Context) {
+	// 这个接口应该在 adminOnly 路由组中，所以不需要额外权限检查
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Not implemented yet",
+	})
+}
+
+// UpdateUser 更新用户信息（仅管理员）
+// PUT /api/v1/users/:id
+func (c *UserController) UpdateUser(ctx *gin.Context) {
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Not implemented yet",
+	})
+}
+
+// DeleteUser 删除用户（仅管理员）
+// DELETE /api/v1/users/:id
+func (c *UserController) DeleteUser(ctx *gin.Context) {
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Not implemented yet",
+	})
+}
+
+// UpdateUserStatus 更新用户状态（仅管理员）
+// PATCH /api/v1/users/:id/status
+func (c *UserController) UpdateUserStatus(ctx *gin.Context) {
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Not implemented yet",
+	})
 }

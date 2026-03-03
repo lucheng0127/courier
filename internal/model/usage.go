@@ -22,7 +22,7 @@ type UsageRecord struct {
 
 // UsageStatsRequest 使用统计查询请求
 type UsageStatsRequest struct {
-	UserID    int64     `form:"user_id" binding:"required"`
+	UserID    int64     `form:"user_id"`
 	StartDate *time.Time `form:"start_date"`
 	EndDate   *time.Time `form:"end_date"`
 	GroupBy   string    `form:"group_by"` // day, model

@@ -32,6 +32,11 @@ func NewChatController(router *service.RouterService, usageService *service.Usag
 	}
 }
 
+// RegisterRoutes 注册路由
+func (c *ChatController) RegisterRoutes(r *gin.RouterGroup) {
+	r.POST("/chat/completions", c.ChatCompletions)
+}
+
 // ChatCompletions Chat Completions 端点
 // POST /v1/chat/completions
 func (c *ChatController) ChatCompletions(ctx *gin.Context) {
