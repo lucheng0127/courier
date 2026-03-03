@@ -11,7 +11,7 @@ TBD - created by archiving change unify-api-and-jwt-auth. Update Purpose after a
 
 - **GIVEN** 用户角色为 `admin`
 - **THEN** 该用户可以访问所有管理接口
-- **AND** 可以创建、读取、更新、删除其他用户
+- **AND** 可以读取、更新、删除其他用户
 - **AND** 可以管理 Providers（创建、读取、更新、删除、重载、启用、禁用）
 - **AND** 可以查询所有用户的使用统计
 - **AND** 可以为任何用户创建 API Key
@@ -115,20 +115,7 @@ TBD - created by archiving change unify-api-and-jwt-auth. Update Purpose after a
 
 ### Requirement: 用户管理权限
 
-系统 SHALL 只允许管理员用户管理用户账户。
-
-#### Scenario: 创建用户
-
-- **GIVEN** 用户已登录
-- **AND** 用户角色为 `admin`
-- **WHEN** 发送 POST 请求到 `/api/v1/users`
-- **THEN** 可以创建用户
-- **AND** 可以指定新用户的角色（`admin` 或 `user`）
-
-- **GIVEN** 用户已登录
-- **AND** 用户角色为 `user`
-- **WHEN** 发送 POST 请求到 `/api/v1/users`
-- **THEN** 返回 403 状态码
+系统 SHALL 只允许管理员用户查看和管理用户账户状态，用户通过自主注册创建。
 
 #### Scenario: 查看用户列表
 

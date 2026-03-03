@@ -13,9 +13,9 @@
 **文件**：`openspec/specs/role-based-access/spec.md`
 
 **变更**：
-- 移除 `### Scenario: 创建用户` 场景
-- 移除 `### Requirement: 用户管理权限` 中关于创建用户的内容
-- 保留其他用户管理功能（查看、更新、删除、状态管理）
+- [x] 移除 `### Scenario: 创建用户` 场景
+- [x] 移除 `### Requirement: 用户管理权限` 中关于创建用户的内容
+- [x] 保留其他用户管理功能（查看、更新、删除、状态管理）
 
 **验证**：确保规范中没有管理员创建用户的描述
 
@@ -28,9 +28,9 @@
 **文件**：`internal/model/user.go`
 
 **变更**：
-- 添加 `RegisterRequest` 结构体（name, email, password）
-- 添加 `RegisterResponse` 结构体（id, name, email, role, status, created_at）
-- 标记 `CreateUserRequest` 为废弃（添加 `// Deprecated: 使用用户自主注册替代` 注释）
+- [x] 添加 `RegisterRequest` 结构体（name, email, password）
+- [x] 添加 `RegisterResponse` 结构体（id, name, email, role, status, created_at）
+- [x] 标记 `CreateUserRequest` 为废弃（添加 `// Deprecated: 使用用户自主注册替代` 注释）
 
 **验证**：模型字段与规范一致
 
@@ -43,16 +43,16 @@
 **文件**：`internal/service/auth.go`
 
 **变更**：
-- 添加 `Register(ctx, req) (*model.User, error)` 方法
-- 实现邮箱唯一性检查
-- 实现密码强度验证（至少 8 个字符）
-- 使用 bcrypt 对密码进行哈希（cost factor 12）
-- 创建用户时设置默认角色为 "user"，默认状态为 "active"
+- [x] 添加 `Register(ctx, req) (*model.User, error)` 方法
+- [x] 实现邮箱唯一性检查
+- [x] 实现密码强度验证（至少 8 个字符）
+- [x] 使用 bcrypt 对密码进行哈希（cost factor 12）
+- [x] 创建用户时设置默认角色为 "user"，默认状态为 "active"
 
 **验证**：
-- 注册成功返回用户信息（不含密码）
-- 邮箱已存在时返回明确错误
-- 密码不符合要求时返回明确错误
+- [x] 注册成功返回用户信息（不含密码）
+- [x] 邮箱已存在时返回明确错误
+- [x] 密码不符合要求时返回明确错误
 
 ---
 
@@ -63,14 +63,14 @@
 **文件**：新建 `internal/middleware/rate_limit.go`
 
 **变更**：
-- 实现 `RegisterRateLimit()` 中间件
-- 使用内存存储跟踪每个 IP 的注册次数
-- 同一 IP 每小时最多 5 次注册请求
-- 超过限制返回 429 状态码
+- [x] 实现 `RegisterRateLimit()` 中间件
+- [x] 使用内存存储跟踪每个 IP 的注册次数
+- [x] 同一 IP 每小时最多 5 次注册请求
+- [x] 超过限制返回 429 状态码
 
 **验证**：
-- 正常请求不受影响
-- 超过限制后返回正确的错误响应
+- [x] 正常请求不受影响
+- [x] 超过限制后返回正确的错误响应
 
 ---
 
@@ -81,16 +81,16 @@
 **文件**：`internal/controller/auth.go`
 
 **变更**：
-- 添加 `Register(ctx)` 方法
-- 请求体绑定和验证
-- 调用 `AuthService.Register()`
-- 处理各种错误情况并返回合适的 HTTP 状态码
+- [x] 添加 `Register(ctx)` 方法
+- [x] 请求体绑定和验证
+- [x] 调用 `AuthService.Register()`
+- [x] 处理各种错误情况并返回合适的 HTTP 状态码
 
 **验证**：
-- 成功注册返回 201 状态码
-- 邮箱冲突返回 409
-- 参数错误返回 400
-- 速率限制返回 429
+- [x] 成功注册返回 201 状态码
+- [x] 邮箱冲突返回 409
+- [x] 参数错误返回 400
+- [x] 速率限制返回 429
 
 ---
 
@@ -101,10 +101,10 @@
 **文件**：`internal/controller/auth.go`
 
 **变更**：
-- 修改 `RegisterRoutes()` 方法
-- 添加 `POST /register` 路由
-- 应用 `RegisterRateLimit()` 中间件
-- 确保该路由不需要 JWT 鉴权
+- [x] 修改 `RegisterRoutes()` 方法
+- [x] 添加 `POST /register` 路由
+- [x] 应用 `RegisterRateLimit()` 中间件
+- [x] 确保该路由不需要 JWT 鉴权
 
 **验证**：路由在无需鉴权的情况下可访问
 
@@ -117,12 +117,12 @@
 **文件**：`internal/controller/user.go`
 
 **变更**：
-- 移除 `CreateUser()` 方法
-- 从 `RegisterRoutes()` 中移除 `users.POST("", c.CreateUser)` 路由
+- [x] 移除 `CreateUser()` 方法
+- [x] 从 `RegisterRoutes()` 中移除 `users.POST("", c.CreateUser)` 路由
 
 **验证**：
-- `POST /api/v1/users` 接口不再可用
-- 其他用户管理接口保持正常
+- [x] `POST /api/v1/users` 接口不再可用
+- [x] 其他用户管理接口保持正常
 
 ---
 
@@ -133,11 +133,11 @@
 **文件**：新建 `internal/service/auth_register_test.go`
 
 **测试用例**：
-- 成功注册新用户
-- 邮箱已存在时注册失败
-- 密码过短时注册失败
-- 注册后用户可以使用该密码登录
-- 验证密码被正确哈希
+- [x] 成功注册新用户
+- [x] 邮箱已存在时注册失败
+- [x] 密码过短时注册失败
+- [x] 注册后用户可以使用该密码登录
+- [x] 验证密码被正确哈希
 
 **验证**：所有测试用例通过，覆盖率 > 80%
 
@@ -150,12 +150,12 @@
 **文件**：新建 `internal/controller/auth_register_test.go`
 
 **测试用例**：
-- 正常注册流程
-- 缺少必填字段
-- 邮箱格式错误
-- 邮箱已存在
-- 密码过短
-- 速率限制
+- [x] 正常注册流程
+- [x] 缺少必填字段
+- [x] 邮箱格式错误
+- [x] 邮箱已存在
+- [x] 密码过短
+- [x] 速率限制
 
 **验证**：所有测试用例通过
 
@@ -168,9 +168,9 @@
 **文件**：`docs/api.md`（如果存在）
 
 **变更**：
-- 添加注册接口文档
-- 更新用户管理接口文档（移除创建接口）
-- 更新认证流程文档
+- [x] 添加注册接口文档
+- [x] 更新用户管理接口文档（移除创建接口）
+- [x] 更新速率限制说明
 
 **验证**：文档与实现一致
 
@@ -196,9 +196,9 @@
 ## 可验证成果
 
 完成所有任务后：
-1. 用户可以通过 `POST /api/v1/auth/register` 自主注册
-2. 新注册用户默认为 "user" 角色，状态为 "active"
-3. 新注册用户可以使用注册邮箱和密码登录
-4. 管理员无法通过 API 创建普通用户
-5. 注册接口有速率限制保护
-6. 所有功能有对应的单元测试和集成测试
+1. [x] 用户可以通过 `POST /api/v1/auth/register` 自主注册
+2. [x] 新注册用户默认为 "user" 角色，状态为 "active"
+3. [x] 新注册用户可以使用注册邮箱和密码登录
+4. [x] 管理员无法通过 API 创建普通用户
+5. [x] 注册接口有速率限制保护
+6. [x] 所有功能有对应的单元测试和集成测试

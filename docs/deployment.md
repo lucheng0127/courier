@@ -57,28 +57,28 @@ export LOG_LEVEL=debug  # debug/info/warn/error
 ### 3. 测试 API
 
 ```bash
-# 登录获取 JWT Token
-ACCESS_TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
+# 用户注册（无需认证）
+REGISTER_RESPONSE=$(curl -s -X POST http://localhost:8080/api/v1/auth/register \
   -H "Content-Type: application/json" \
-  -d '{
-    "email": "admin@example.com",
-    "password": "admin-password-change-me"
-  }' | jq -r '.access_token')
-
-# 创建用户
-USER_RESPONSE=$(curl -s -X POST http://localhost:8080/api/v1/users \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -d '{
     "name": "张三",
-    "email": "zhangsan@example.com"
+    "email": "zhangsan@example.com",
+    "password": "user-password-123"
   }')
-USER_ID=$(echo $USER_RESPONSE | jq -r '.id')
+USER_ID=$(echo $REGISTER_RESPONSE | jq -r '.id')
 
-# 为用户创建 API Key
+# 用户登录获取 JWT Token
+USER_ACCESS_TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "zhangsan@example.com",
+    "password": "user-password-123"
+  }' | jq -r '.access_token')
+
+# 为自己创建 API Key
 API_KEY_RESPONSE=$(curl -s -X POST "http://localhost:8080/api/v1/users/$USER_ID/api-keys" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Authorization: Bearer $USER_ACCESS_TOKEN" \
   -d '{
     "name": "生产环境 Key"
   }')
@@ -94,9 +94,21 @@ curl -X POST http://localhost:8080/v1/chat/completions \
     "messages": [{"role": "user", "content": "Hello!"}]
   }'
 
-# 查询使用统计
-curl "http://localhost:8080/api/v1/usage?user_id=$USER_ID" \
-  -H "Authorization: Bearer $ACCESS_TOKEN"
+# 查询自己的使用统计
+curl "http://localhost:8080/api/v1/usage" \
+  -H "Authorization: Bearer $USER_ACCESS_TOKEN"
+
+# 管理员登录获取 JWT Token
+ADMIN_ACCESS_TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@example.com",
+    "password": "admin-password-change-me"
+  }' | jq -r '.access_token')
+
+# 查询所有用户（仅管理员）
+curl http://localhost:8080/api/v1/users \
+  -H "Authorization: Bearer $ADMIN_ACCESS_TOKEN"
 ```
 
 ### 4. 管理 Provider
@@ -231,7 +243,10 @@ export AUTO_MIGRATE=false
 1. **密钥管理**
    - 设置强随机密钥的 `JWT_SECRET`（至少 32 字符）
    - 设置强密码的 `DATABASE_URL`
-   - 配置 `INITIAL_ADMIN_EMAIL` 和 `INITIAL_ADMIN_PASSWORD` 创建初始管理员
+   - **初始管理员**：通过 `INITIAL_ADMIN_EMAIL` 和 `INITIAL_ADMIN_PASSWORD` 环境变量创建初始管理员账户
+     - 这是创建管理员用户的唯一方式
+     - 用户注册只能创建普通用户（role="user"）
+     - 如需创建更多管理员，需通过数据库直接操作用户角色
 
 2. **HTTPS**
    - 生产环境必须使用 HTTPS
@@ -282,16 +297,16 @@ curl http://localhost:8080/health
 
 ### 认证接口（无需鉴权）
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/v1/auth/login` | 用户登录获取 JWT Token |
-| POST | `/api/v1/auth/refresh` | 刷新 JWT Token |
+| 方法 | 路径 | 说明 | 速率限制 |
+|------|------|------|----------|
+| POST | `/api/v1/auth/register` | 用户注册 | IP 级别，5 次/小时 |
+| POST | `/api/v1/auth/login` | 用户登录获取 JWT Token | - |
+| POST | `/api/v1/auth/refresh` | 刷新 JWT Token | - |
 
 ### 管理接口（需要 JWT Token，Admin 角色）
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/v1/users` | 创建用户 |
 | GET | `/api/v1/users` | 查询用户列表 |
 | GET | `/api/v1/users/:id` | 获取用户信息 |
 | PUT | `/api/v1/users/:id` | 更新用户 |

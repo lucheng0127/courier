@@ -38,6 +38,7 @@ func (APIKey) TableName() string {
 }
 
 // CreateUserRequest 创建用户请求
+// Deprecated: 使用用户自主注册替代，管理员不再通过 API 创建用户
 type CreateUserRequest struct {
 	Name  string `json:"name" binding:"required"`
 	Email string `json:"email" binding:"required,email"`
@@ -96,4 +97,21 @@ type RefreshTokenResponse struct {
 	RefreshToken string `json:"refresh_token"`
 	TokenType    string `json:"token_type"`
 	ExpiresIn    int    `json:"expires_in"`
+}
+
+// RegisterRequest 用户注册请求
+type RegisterRequest struct {
+	Name     string `json:"name" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8"`
+}
+
+// RegisterResponse 用户注册响应
+type RegisterResponse struct {
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	Email     string    `json:"email"`
+	Role      string    `json:"role"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
 }

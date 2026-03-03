@@ -27,7 +27,6 @@ func (c *UserController) RegisterRoutes(r *gin.RouterGroup) {
 	users := r.Group("/users")
 	{
 		// 用户管理（仅管理员）
-		users.POST("", c.CreateUser)
 		users.GET("", c.ListUsers)
 		users.PUT("/:id", c.UpdateUser)
 		users.DELETE("/:id", c.DeleteUser)
@@ -41,37 +40,6 @@ func (c *UserController) RegisterRoutes(r *gin.RouterGroup) {
 		users.GET("/:id/api-keys", c.ListAPIKeys)
 		users.DELETE("/:id/api-keys/:key_id", c.RevokeAPIKey)
 	}
-}
-
-// CreateUser 创建用户（仅管理员）
-// POST /api/v1/users
-func (c *UserController) CreateUser(ctx *gin.Context) {
-	var req model.CreateUserRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": err.Error(),
-			"type":    "invalid_request_error",
-		})
-		return
-	}
-
-	user, err := c.authSvc.CreateUser(ctx, &req)
-	if err != nil {
-		if err.Error() == "email already exists" {
-			ctx.JSON(http.StatusConflict, gin.H{
-				"message": "Email already exists",
-				"type":    "invalid_request_error",
-			})
-			return
-		}
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Failed to create user",
-			"type":    "api_error",
-		})
-		return
-	}
-
-	ctx.JSON(http.StatusCreated, user)
 }
 
 // GetUser 获取用户信息
