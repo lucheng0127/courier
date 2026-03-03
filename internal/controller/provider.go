@@ -36,13 +36,14 @@ func NewProviderController(svc ProviderService) *ProviderController {
 
 // CreateProviderRequest 创建 Provider 请求
 type CreateProviderRequest struct {
-	Name        string              `json:"name" binding:"required"`
-	Type        string              `json:"type" binding:"required"`
-	BaseURL     string              `json:"base_url" binding:"required"`
-	Timeout     int                 `json:"timeout" binding:"required,min=1"`
-	APIKey      string              `json:"api_key,omitempty"`
-	ExtraConfig map[string]any      `json:"extra_config,omitempty"`
-	Enabled     bool                `json:"enabled"`
+	Name           string         `json:"name" binding:"required"`
+	Type           string         `json:"type" binding:"required"`
+	BaseURL        string         `json:"base_url" binding:"required"`
+	Timeout        int            `json:"timeout" binding:"required,min=1"`
+	APIKey         string         `json:"api_key,omitempty"`
+	ExtraConfig    map[string]any `json:"extra_config,omitempty"`
+	Enabled        bool           `json:"enabled"`
+	FallbackModels []interface{}  `json:"fallback_models,omitempty"`
 }
 
 // UpdateProviderRequest 更新 Provider 请求
@@ -76,6 +77,17 @@ func (c *ProviderController) CreateProvider(ctx *gin.Context) {
 
 	if req.APIKey != "" {
 		provider.APIKey = &req.APIKey
+	}
+
+	// 处理 FallbackModels
+	if req.FallbackModels != nil {
+		fallbackJSON := make(model.JSON)
+		for _, v := range req.FallbackModels {
+			if str, ok := v.(string); ok {
+				fallbackJSON[str] = true
+			}
+		}
+		provider.FallbackModels = fallbackJSON
 	}
 
 	if err := c.svc.CreateProvider(context.Background(), provider); err != nil {

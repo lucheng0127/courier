@@ -77,22 +77,96 @@ func (c *ProviderConfig) GetConfig() map[string]any {
 }
 
 // parseJSONToStringArray 从 JSON map 解析字符串数组
+// 支持两种格式：
+// 1. 数组格式（数据库直接存储）：{"0": "model-1", "1": "model-2"}
+// 2. Set 格式（Service 层转换）：{"model-1": true, "model-2": true}
 func parseJSONToStringArray(j model.JSON) []string {
-	result := make([]string, 0)
+	result := make([]string, 0, len(j))
 
-	// 尝试各种可能的类型断言
+	// 优先尝试 Set 格式（key 是模型名，value 是 true）
+	isSetFormat := true
 	for _, v := range j {
-		if str, ok := v.(string); ok {
-			result = append(result, str)
-		} else if arr, ok := v.([]interface{}); ok {
-			// 嵌套数组
-			for _, item := range arr {
-				if str, ok := item.(string); ok {
+		if boolVal, ok := v.(bool); !ok || !boolVal {
+			isSetFormat = false
+			break
+		}
+	}
+
+	if isSetFormat && len(j) > 0 {
+		// Set 格式：key 是模型名
+		for k := range j {
+			result = append(result, k)
+		}
+		return result
+	}
+
+	// 数组格式：value 是模型名（按索引顺序）
+	// 需要按数字索引排序以保证顺序
+	maxIdx := -1
+	for k := range j {
+		// 检查 key 是否是数字索引
+		idx := -1
+		// 尝试解析为整数
+		allDigits := true
+		for _, c := range k {
+			if c < '0' || c > '9' {
+				allDigits = false
+				break
+			}
+		}
+		if allDigits && len(k) > 0 {
+			idx = atoi(k)
+		}
+		if idx > maxIdx {
+			maxIdx = idx
+		}
+	}
+
+	if maxIdx >= 0 {
+		// 按索引顺序收集
+		result = make([]string, 0, maxIdx+1)
+		for i := 0; i <= maxIdx; i++ {
+			if v, ok := j[itoa(i)]; ok {
+				if str, ok := v.(string); ok {
 					result = append(result, str)
 				}
 			}
 		}
+		return result
+	}
+
+	// 兜底：直接取所有字符串值
+	for _, v := range j {
+		if str, ok := v.(string); ok {
+			result = append(result, str)
+		}
 	}
 
 	return result
+}
+
+// 简单的字符串转整数
+func atoi(s string) int {
+	n := 0
+	for _, c := range s {
+		n = n*10 + int(c-'0')
+	}
+	return n
+}
+
+// 整数转字符串
+func itoa(i int) string {
+	if i == 0 {
+		return "0"
+	}
+	buf := make([]byte, 0, 10)
+	for i > 0 {
+		buf = append(buf, byte('0'+i%10))
+		i /= 10
+	}
+	// 反转
+	for i, j := 0, len(buf)-1; i < j; i, j = i+1, j-1 {
+		buf[i], buf[j] = buf[j], buf[i]
+	}
+	return string(buf)
 }
