@@ -17,7 +17,7 @@ type UsageRecord struct {
 	LatencyMs        int64     `json:"latency_ms" db:"latency_ms"`
 	Status           string    `json:"status" db:"status" gorm:"index"` // success, error
 	ErrorType        string    `json:"error_type,omitempty" db:"error_type"`
-	Timestamp        time.Time `json:"timestamp" db:"timestamp" gorm:"autoCreateTime"`
+	Timestamp        time.Time `json:"timestamp" db:"timestamp" gorm:"autoCreateTime;default:NOW()"`
 }
 
 // TableName 指定表名

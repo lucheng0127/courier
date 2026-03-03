@@ -41,8 +41,8 @@ type Provider struct {
 	ExtraConfig   JSON      `json:"extra_config,omitempty" db:"extra_config" gorm:"type:jsonb"` // 可选：扩展配置
 	Enabled       bool      `json:"enabled" db:"enabled" gorm:"default:true"`         // 启用状态，默认 true
 	FallbackModels JSON     `json:"fallback_models,omitempty" db:"fallback_models" gorm:"type:jsonb"` // 可选：Fallback 模型列表 ["model-1", "model-2"]
-	CreatedAt     time.Time `json:"created_at" db:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt     time.Time `json:"updated_at" db:"updated_at" gorm:"autoUpdateTime"`
+	CreatedAt     time.Time `json:"created_at" db:"created_at" gorm:"autoCreateTime;default:NOW()"`
+	UpdatedAt     time.Time `json:"updated_at" db:"updated_at" gorm:"autoUpdateTime;default:NOW()"`
 }
 
 // TableName 指定表名

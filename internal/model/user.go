@@ -10,8 +10,8 @@ type User struct {
 	PasswordHash string    `json:"-" db:"password_hash" gorm:"not null"` // 密码哈希，不输出到 JSON
 	Role         string    `json:"role" db:"role" gorm:"index;default:'user'"`       // user, admin
 	Status       string    `json:"status" db:"status" gorm:"index;default:'active'"`   // active, disabled
-	CreatedAt    time.Time `json:"created_at" db:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt    time.Time `json:"updated_at" db:"updated_at" gorm:"autoUpdateTime"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at" gorm:"autoCreateTime;default:NOW()"`
+	UpdatedAt    time.Time `json:"updated_at" db:"updated_at" gorm:"autoUpdateTime;default:NOW()"`
 }
 
 // TableName 指定表名
@@ -29,7 +29,7 @@ type APIKey struct {
 	Status     string     `json:"status" db:"status" gorm:"index;default:'active'"`  // active, disabled, revoked
 	LastUsedAt *time.Time `json:"last_used_at,omitempty" db:"last_used_at"`
 	ExpiresAt  *time.Time `json:"expires_at,omitempty" db:"expires_at"`
-	CreatedAt  time.Time  `json:"created_at" db:"created_at" gorm:"autoCreateTime"`
+	CreatedAt  time.Time  `json:"created_at" db:"created_at" gorm:"autoCreateTime;default:NOW()"`
 }
 
 // TableName 指定表名
