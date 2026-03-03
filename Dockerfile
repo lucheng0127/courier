@@ -1,5 +1,6 @@
 # Build stage
 FROM golang:1.23-alpine AS builder
+ENV GOPROXY=https://goproxy.io,direct
 
 WORKDIR /app
 
