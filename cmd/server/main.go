@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,20 +11,30 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"go.uber.org/zap"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 
 	_ "github.com/lucheng0127/courier/internal/adapter/openai"
 	_ "github.com/lucheng0127/courier/internal/adapter/vllm"
 	"github.com/lucheng0127/courier/internal/bootstrap"
 	"github.com/lucheng0127/courier/internal/controller"
+	"github.com/lucheng0127/courier/internal/logger"
+	"github.com/lucheng0127/courier/internal/migrate"
 	"github.com/lucheng0127/courier/internal/middleware"
 	"github.com/lucheng0127/courier/internal/repository"
 	"github.com/lucheng0127/courier/internal/service"
 )
 
-func main() {
-	log.Println("Starting Courier LLM Gateway...")
+const schemaVersion = "v1.0.0"
 
-	// 数据库连接
+func main() {
+	// 1. 初始化 Logger
+	logger.InitFromEnv()
+	defer logger.Sync()
+	logger.L.Info("Starting Courier LLM Gateway...")
+
+	// 2. 数据库连接
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
 		dbURL = "host=localhost port=5432 user=courier password=courier dbname=courier sslmode=disable"
@@ -33,21 +42,42 @@ func main() {
 
 	db, err := sqlx.Connect("postgres", dbURL)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		logger.L.Fatal("Failed to connect to database",
+			zap.Error(err))
 	}
 	defer db.Close()
 
-	log.Println("Connected to database")
+	logger.L.Info("Connected to database")
 
-	// 初始化 Repository
+	// 3. 数据库自动迁移
+	autoMigrate := os.Getenv("AUTO_MIGRATE")
+	if autoMigrate != "false" {
+		// 创建 GORM DB 用于迁移
+		gormDB, err := gorm.Open(postgres.Open(dbURL), &gorm.Config{})
+		if err != nil {
+			logger.L.Fatal("Failed to create GORM DB for migration",
+				zap.Error(err))
+		}
+
+		migrator := migrate.NewMigrator(gormDB, schemaVersion)
+		if err := migrator.Run(); err != nil {
+			logger.L.Fatal("Database migration failed",
+				zap.Error(err))
+		}
+	} else {
+		logger.L.Warn("Auto migration disabled by AUTO_MIGRATE=false")
+	}
+
+	// 4. 初始化 Repository
 	providerRepo := repository.NewProviderRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	usageRepo := repository.NewUsageRepository(db)
 
-	// 初始化 Service
+	// 5. 初始化 Service
 	jwtSvc, err := service.NewJWTService()
 	if err != nil {
-		log.Fatalf("Failed to initialize JWT service: %v", err)
+		logger.L.Fatal("Failed to initialize JWT service",
+			zap.Error(err))
 	}
 
 	providerSvc := service.NewProviderService(providerRepo)
@@ -55,24 +85,26 @@ func main() {
 	usageSvc := service.NewUsageService(usageRepo, userRepo)
 	routerSvc := service.NewRouterService()
 
-	// 确保存在初始管理员用户
+	// 6. 确保存在初始管理员用户
 	if err := authSvc.EnsureInitialAdmin(context.Background()); err != nil {
-		log.Printf("Warning: Failed to ensure initial admin: %v", err)
+		logger.L.Warn("Failed to ensure initial admin",
+			zap.Error(err))
 	}
 
-	// 初始化 Providers
+	// 7. 初始化 Providers
 	ctx := context.Background()
 	if err := bootstrap.InitProviders(ctx, providerSvc); err != nil {
-		log.Printf("Warning: Provider initialization had issues: %v", err)
+		logger.L.Warn("Provider initialization had issues",
+			zap.Error(err))
 	}
 
-	// 创建路由
+	// 8. 创建路由
 	router := gin.Default()
 
 	// 设置路由
 	setupRoutes(router, providerSvc, authSvc, usageSvc, routerSvc, jwtSvc)
 
-	// 启动服务器
+	// 9. 启动服务器
 	addr := ":8080"
 	if port := os.Getenv("PORT"); port != "" {
 		addr = ":" + port
@@ -84,34 +116,38 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("HTTP server listening on %s", addr)
+		logger.L.Info("HTTP server listening",
+			zap.String("addr", addr))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", err)
+			logger.L.Fatal("Failed to start server",
+				zap.Error(err))
 		}
 	}()
 
-	log.Println("Courier LLM Gateway started")
+	logger.L.Info("Courier LLM Gateway started")
 
-	// 等待信号退出
+	// 10. 等待信号退出
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Shutting down...")
+	logger.L.Info("Shutting down...")
 
 	// 关闭 Usage Service
 	if err := usageSvc.Close(); err != nil {
-		log.Printf("Failed to close usage service: %v", err)
+		logger.L.Error("Failed to close usage service",
+			zap.Error(err))
 	}
 
 	// 优雅关闭服务器
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Printf("Server forced to shutdown: %v", err)
+		logger.L.Error("Server forced to shutdown",
+			zap.Error(err))
 	}
 
-	log.Println("Server exited")
+	logger.L.Info("Server exited")
 }
 
 // setupRoutes 设置所有路由

@@ -1,160 +1,75 @@
 package logger
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
 	"os"
-	"sync"
-	"time"
+	"strings"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
-// LogLevel 日志级别
-type LogLevel string
+var L *zap.Logger
 
-const (
-	LevelDebug LogLevel = "debug"
-	LevelInfo  LogLevel = "info"
-	LevelWarn  LogLevel = "warn"
-	LevelError LogLevel = "error"
-)
-
-// Logger 结构化日志记录器
-type Logger struct {
-	mu     sync.Mutex
-	out    io.Writer
-	level  LogLevel
-	fields map[string]any
-}
-
-// NewLogger 创建日志记录器
-func NewLogger(out io.Writer, level LogLevel) *Logger {
-	if out == nil {
-		out = os.Stdout
-	}
-	return &Logger{
-		out:    out,
-		level:  level,
-		fields: make(map[string]any),
-	}
-}
-
-// With 添加字段
-func (l *Logger) With(fields map[string]any) *Logger {
-	newLogger := &Logger{
-		out:    l.out,
-		level:  l.level,
-		fields: make(map[string]any),
-	}
-	// 复制现有字段
-	for k, v := range l.fields {
-		newLogger.fields[k] = v
-	}
-	// 添加新字段
-	for k, v := range fields {
-		newLogger.fields[k] = v
-	}
-	return newLogger
-}
-
-// log 内部日志方法
-func (l *Logger) log(level LogLevel, msg string, fields map[string]any) {
-	// 检查日志级别
-	if !l.shouldLog(level) {
-		return
+// Init 初始化全局 logger
+// level: debug, info, warn, error
+// env: development, production
+func Init(level string, env string) {
+	// 解析日志级别
+	var zapLevel zapcore.Level
+	switch strings.ToLower(level) {
+	case "debug":
+		zapLevel = zapcore.DebugLevel
+	case "info":
+		zapLevel = zapcore.InfoLevel
+	case "warn":
+		zapLevel = zapcore.WarnLevel
+	case "error":
+		zapLevel = zapcore.ErrorLevel
+	default:
+		zapLevel = zapcore.InfoLevel
 	}
 
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	// 构建日志条目
-	entry := make(map[string]any)
-	entry["timestamp"] = time.Now().UTC().Format(time.RFC3339)
-	entry["level"] = level
-	entry["message"] = msg
-
-	// 添加固定字段
-	for k, v := range l.fields {
-		entry[k] = v
+	// 配置 encoder
+	var config zap.Config
+	if strings.ToLower(env) == "development" {
+		// 开发环境：console 格式，debug 级别
+		config = zap.NewDevelopmentConfig()
+		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		config.Level = zap.NewAtomicLevelAt(zapLevel)
+	} else {
+		// 生产环境：JSON 格式
+		config = zap.NewProductionConfig()
+		config.Level = zap.NewAtomicLevelAt(zapLevel)
 	}
 
-	// 添加临时字段
-	for k, v := range fields {
-		entry[k] = v
-	}
-
-	// JSON 序列化
-	data, err := json.Marshal(entry)
+	logger, err := config.Build()
 	if err != nil {
-		fmt.Fprintf(l.out, `{"timestamp":"%s","level":"%s","message":"failed to marshal log: %v"}`+"\n",
-			time.Now().UTC().Format(time.RFC3339), level, err)
-		return
+		panic(err)
 	}
 
-	l.out.Write(data)
-	l.out.Write([]byte("\n"))
+	L = logger
 }
 
-// shouldLog 检查是否应该记录日志
-func (l *Logger) shouldLog(level LogLevel) bool {
-	levels := map[LogLevel]int{
-		LevelDebug: 0,
-		LevelInfo:  1,
-		LevelWarn:  2,
-		LevelError: 3,
+// InitFromEnv 从环境变量初始化 logger
+// LOG_LEVEL: 日志级别（默认 info）
+// ENV: 环境类型（默认 production）
+func InitFromEnv() {
+	level := os.Getenv("LOG_LEVEL")
+	if level == "" {
+		level = "info"
 	}
-	return levels[level] >= levels[l.level]
+
+	env := os.Getenv("ENV")
+	if env == "" {
+		env = "production"
+	}
+
+	Init(level, env)
 }
 
-// Debug 记录 Debug 级别日志
-func (l *Logger) Debug(msg string, fields map[string]any) {
-	l.log(LevelDebug, msg, fields)
-}
-
-// Info 记录 Info 级别日志
-func (l *Logger) Info(msg string, fields map[string]any) {
-	l.log(LevelInfo, msg, fields)
-}
-
-// Warn 记录 Warn 级别日志
-func (l *Logger) Warn(msg string, fields map[string]any) {
-	l.log(LevelWarn, msg, fields)
-}
-
-// Error 记录 Error 级别日志
-func (l *Logger) Error(msg string, fields map[string]any) {
-	l.log(LevelError, msg, fields)
-}
-
-// 全局日志实例
-var defaultLogger = NewLogger(os.Stdout, LevelInfo)
-
-// SetDefaultLevel 设置默认日志级别
-func SetDefaultLevel(level LogLevel) {
-	defaultLogger.level = level
-}
-
-// Debug 全局 Debug 日志
-func Debug(msg string, fields map[string]any) {
-	defaultLogger.Debug(msg, fields)
-}
-
-// Info 全局 Info 日志
-func Info(msg string, fields map[string]any) {
-	defaultLogger.Info(msg, fields)
-}
-
-// Warn 全局 Warn 日志
-func Warn(msg string, fields map[string]any) {
-	defaultLogger.Warn(msg, fields)
-}
-
-// Error 全局 Error 日志
-func Error(msg string, fields map[string]any) {
-	defaultLogger.Error(msg, fields)
-}
-
-// With 全局 With 方法
-func With(fields map[string]any) *Logger {
-	return defaultLogger.With(fields)
+// Sync 刷新缓冲区
+func Sync() {
+	if L != nil {
+		_ = L.Sync()
+	}
 }

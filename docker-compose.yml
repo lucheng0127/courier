@@ -36,12 +36,15 @@ services:
       # 初始管理员配置（可选）
       INITIAL_ADMIN_EMAIL: admin@example.com
       INITIAL_ADMIN_PASSWORD: admin123456
+      # 日志和迁移配置
+      LOG_LEVEL: info
+      ENV: production
+      AUTO_MIGRATE: "true"
     ports:
       - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
-    command: ["/app/server", "migrate", "up"]
 
 volumes:
   postgres_data:

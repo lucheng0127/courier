@@ -30,9 +30,6 @@ RUN apk --no-cache add ca-certificates
 # 从构建阶段复制二进制文件
 COPY --from=builder /app/server .
 
-# 复制迁移文件
-COPY --from=builder /app/migrations ./migrations
-
 # 暴露端口
 EXPOSE 8080
 
