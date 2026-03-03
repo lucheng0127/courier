@@ -160,6 +160,98 @@ func (s *ProviderService) DisableProvider(ctx context.Context, name string) erro
 	return nil
 }
 
+// UpdateProvider 更新 Provider 配置
+func (s *ProviderService) UpdateProvider(ctx context.Context, name string, updates map[string]any) (*model.Provider, error) {
+	// 获取现有 Provider
+	provider, err := s.repo.GetByName(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("provider not found: %s", name)
+	}
+
+	// 记录原始启用状态
+	wasEnabled := provider.Enabled
+
+	// 应用更新
+	if val, ok := updates["type"].(string); ok {
+		provider.Type = val
+	}
+	if val, ok := updates["base_url"].(string); ok {
+		provider.BaseURL = val
+	}
+	if val, ok := updates["timeout"].(int); ok {
+		provider.Timeout = val
+	}
+	if val, ok := updates["api_key"].(string); ok && val != "" {
+		provider.APIKey = &val
+	}
+	if val, ok := updates["extra_config"].(map[string]any); ok {
+		provider.ExtraConfig = val
+	}
+	if val, ok := updates["enabled"].(bool); ok {
+		provider.Enabled = val
+	}
+	if val, ok := updates["fallback_models"].([]interface{}); ok {
+		// 将 []interface{} 转换为 model.JSON
+		fallbackJSON := make(model.JSON)
+		for _, v := range val {
+			if str, ok := v.(string); ok {
+				fallbackJSON[str] = true
+			}
+		}
+		provider.FallbackModels = fallbackJSON
+	}
+
+	// 更新数据库
+	if err := s.repo.Update(ctx, provider); err != nil {
+		return nil, fmt.Errorf("failed to update provider: %w", err)
+	}
+
+	// 根据启用状态变化处理
+	if !wasEnabled && provider.Enabled {
+		// 从禁用变为启用：初始化并注册
+		if err := s.initAndRegisterProvider(provider); err != nil {
+			log.Printf("Failed to initialize provider %s after update: %v", name, err)
+			return provider, nil // 返回更新后的配置，但记录初始化失败
+		}
+	} else if wasEnabled && !provider.Enabled {
+		// 从启用变为禁用：注销
+		adapter.UnregisterProvider(name)
+		log.Printf("Provider %s disabled after update", name)
+	} else if provider.Enabled {
+		// 保持启用状态：重载配置
+		if err := s.ReloadProvider(ctx, name); err != nil {
+			log.Printf("Failed to reload provider %s after update: %v", name, err)
+			return provider, nil // 返回更新后的配置，但记录重载失败
+		}
+	}
+
+	log.Printf("Provider %s updated successfully", name)
+	return provider, nil
+}
+
+// DeleteProvider 删除 Provider
+func (s *ProviderService) DeleteProvider(ctx context.Context, name string) error {
+	// 获取 Provider
+	provider, err := s.repo.GetByName(ctx, name)
+	if err != nil {
+		return fmt.Errorf("provider not found: %s", name)
+	}
+
+	// 如果正在运行，先注销
+	if provider.Enabled {
+		adapter.UnregisterProvider(name)
+		log.Printf("Provider %s unregistered before deletion", name)
+	}
+
+	// 从数据库删除
+	if err := s.repo.Delete(ctx, provider.ID); err != nil {
+		return fmt.Errorf("failed to delete provider: %w", err)
+	}
+
+	log.Printf("Provider %s deleted successfully", name)
+	return nil
+}
+
 // InitProviders 初始化所有 Provider
 func (s *ProviderService) InitProviders(ctx context.Context) error {
 	providers, err := s.repo.List(ctx)

@@ -226,9 +226,41 @@ curl http://localhost:8080/api/v1/providers \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
+### 更新 Provider
+
+```bash
+# 更新 Provider 配置
+curl -X PUT http://localhost:8080/api/v1/providers/openai-main \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -d '{
+    "timeout": 120,
+    "enabled": false
+  }'
+```
+
+**说明**：
+- 只需提供要更新的字段，未提供的字段保持原值
+- 如果 Provider 已启用，更新后会自动重载
+- 如果从禁用变为启用，会自动初始化并注册
+- 如果从启用变为禁用，会自动注销并清理
+
+### 删除 Provider
+
+```bash
+# 删除 Provider
+curl -X DELETE http://localhost:8080/api/v1/providers/old-provider \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+**说明**：
+- 删除前会自动注销运行中的 Provider
+- 删除操作不可逆，请谨慎操作
+- 如果 Provider 正在被使用，建议先禁用再删除
+
 ### 重载 Provider
 
-修改 Provider 配置后，需要重载使其生效：
+修改 Provider 配置后，也可以手动重载使其生效：
 
 ```bash
 # 重载所有 Provider
@@ -251,6 +283,8 @@ curl -X POST http://localhost:8080/api/v1/admin/providers/openai-main/disable \
 curl -X POST http://localhost:8080/api/v1/admin/providers/openai-main/enable \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
+
+**注意**：也可以通过更新 API 的 `enabled` 字段来启用/禁用 Provider，更新操作会自动处理状态转换。
 
 ## 最佳实践
 

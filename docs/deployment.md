@@ -91,7 +91,7 @@ curl "http://localhost:8080/api/v1/usage?user_id=$USER_ID" \
 ### 5. 管理 Provider
 
 ```bash
-# 创建 Provider（带 Fallback 配置）
+# 创建 OpenAI Provider（带 Fallback 配置）
 curl -X POST http://localhost:8080/api/v1/providers \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
@@ -105,8 +105,43 @@ curl -X POST http://localhost:8080/api/v1/providers \
     "fallback_models": ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"]
   }'
 
+# 创建通义千问 Provider
+curl -X POST http://localhost:8080/api/v1/providers \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -d '{
+    "name": "qwen-main",
+    "type": "openai",
+    "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "timeout": 60,
+    "api_key": "your-api-key",
+    "enabled": true,
+    "extra_config": {
+      "temperature": 0.8,
+      "max_tokens": 1500
+    },
+    "fallback_models": ["qwen-max", "qwen-plus", "qwen-turbo"]
+  }'
+
 # 查询 Provider 列表
 curl http://localhost:8080/api/v1/providers \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+
+# 获取单个 Provider 信息
+curl http://localhost:8080/api/v1/providers/openai-main \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+
+# 更新 Provider（只更新需要修改的字段）
+curl -X PUT http://localhost:8080/api/v1/providers/openai-main \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -d '{
+    "timeout": 120,
+    "enabled": false
+  }'
+
+# 删除 Provider
+curl -X DELETE http://localhost:8080/api/v1/providers/old-provider \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 
 # 重载 Provider
@@ -264,6 +299,9 @@ psql $DATABASE_URL -f migrations/000001_create_providers.down.sql
 | PATCH | `/api/v1/users/:id/status` | 更新用户状态 |
 | POST | `/api/v1/providers` | 创建 Provider |
 | GET | `/api/v1/providers` | 查询 Provider 列表 |
+| GET | `/api/v1/providers/:name` | 获取单个 Provider 信息 |
+| PUT | `/api/v1/providers/:name` | 更新 Provider 配置 |
+| DELETE | `/api/v1/providers/:name` | 删除 Provider |
 | POST | `/api/v1/providers/reload` | 重载所有 Provider |
 | POST | `/api/v1/admin/providers/:name/reload` | 重载指定 Provider |
 | POST | `/api/v1/admin/providers/:name/enable` | 启用 Provider |

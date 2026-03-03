@@ -1,20 +1,36 @@
 package controller
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lucheng0127/courier/internal/adapter"
 	"github.com/lucheng0127/courier/internal/model"
 	"github.com/lucheng0127/courier/internal/service"
 )
 
+// ProviderService Provider 服务接口（用于依赖注入和测试）
+type ProviderService interface {
+	CreateProvider(ctx context.Context, provider *model.Provider) error
+	GetProvider(name string) (adapter.Provider, error)
+	ListProviders(ctx context.Context) ([]*service.ProviderInfo, error)
+	UpdateProvider(ctx context.Context, name string, updates map[string]any) (*model.Provider, error)
+	DeleteProvider(ctx context.Context, name string) error
+	ReloadProvider(ctx context.Context, name string) error
+	ReloadAllProviders(ctx context.Context) error
+	EnableProvider(ctx context.Context, name string) error
+	DisableProvider(ctx context.Context, name string) error
+	InitProviders(ctx context.Context) error
+}
+
 // ProviderController Provider 管理 API 控制器
 type ProviderController struct {
-	svc *service.ProviderService
+	svc ProviderService
 }
 
 // NewProviderController 创建 Provider Controller
-func NewProviderController(svc *service.ProviderService) *ProviderController {
+func NewProviderController(svc ProviderService) *ProviderController {
 	return &ProviderController{svc: svc}
 }
 
@@ -31,12 +47,13 @@ type CreateProviderRequest struct {
 
 // UpdateProviderRequest 更新 Provider 请求
 type UpdateProviderRequest struct {
-	Type        string              `json:"type,omitempty" binding:"required_with=BaseURL Timeout"`
-	BaseURL     string              `json:"base_url,omitempty"`
-	Timeout     int                 `json:"timeout,omitempty,min=1"`
-	APIKey      string              `json:"api_key,omitempty"`
-	ExtraConfig map[string]any      `json:"extra_config,omitempty"`
-	Enabled     *bool               `json:"enabled,omitempty"`
+	Type            string         `json:"type,omitempty"`
+	BaseURL         string         `json:"base_url,omitempty"`
+	Timeout         int            `json:"timeout,omitempty"`
+	APIKey          string         `json:"api_key,omitempty"`
+	ExtraConfig     map[string]any `json:"extra_config,omitempty"`
+	Enabled         *bool          `json:"enabled,omitempty"`
+	FallbackModels  []interface{}  `json:"fallback_models,omitempty"`
 }
 
 // CreateProvider 创建 Provider
@@ -61,7 +78,7 @@ func (c *ProviderController) CreateProvider(ctx *gin.Context) {
 		provider.APIKey = &req.APIKey
 	}
 
-	if err := c.svc.CreateProvider(ctx, provider); err != nil {
+	if err := c.svc.CreateProvider(context.Background(), provider); err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -72,7 +89,7 @@ func (c *ProviderController) CreateProvider(ctx *gin.Context) {
 // ListProviders 列出所有 Provider
 // GET /api/v1/providers
 func (c *ProviderController) ListProviders(ctx *gin.Context) {
-	providers, err := c.svc.ListProviders(ctx)
+	providers, err := c.svc.ListProviders(context.Background())
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -101,21 +118,83 @@ func (c *ProviderController) GetProvider(ctx *gin.Context) {
 // UpdateProvider 更新 Provider
 // PUT /api/v1/providers/:name
 func (c *ProviderController) UpdateProvider(ctx *gin.Context) {
+	name := ctx.Param("name")
+
 	var req UpdateProviderRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// TODO: 实现更新逻辑
-	ctx.JSON(http.StatusNotImplemented, gin.H{"error": "not implemented"})
+	// 构建更新映射
+	updates := make(map[string]any)
+	if req.Type != "" {
+		updates["type"] = req.Type
+	}
+	if req.BaseURL != "" {
+		updates["base_url"] = req.BaseURL
+	}
+	if req.Timeout > 0 {
+		updates["timeout"] = req.Timeout
+	}
+	if req.APIKey != "" {
+		updates["api_key"] = req.APIKey
+	}
+	if req.ExtraConfig != nil {
+		updates["extra_config"] = req.ExtraConfig
+	}
+	if req.Enabled != nil {
+		updates["enabled"] = *req.Enabled
+	}
+	if req.FallbackModels != nil {
+		updates["fallback_models"] = req.FallbackModels
+	}
+
+	// 调用 Service 层更新
+	provider, err := c.svc.UpdateProvider(context.Background(), name, updates)
+	if err != nil {
+		// 检查是否是"not found"错误
+		if containsString(err.Error(), "not found") {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, provider)
 }
 
 // DeleteProvider 删除 Provider
 // DELETE /api/v1/providers/:name
 func (c *ProviderController) DeleteProvider(ctx *gin.Context) {
-	// TODO: 实现删除逻辑
-	ctx.JSON(http.StatusNotImplemented, gin.H{"error": "not implemented"})
+	name := ctx.Param("name")
+
+	if err := c.svc.DeleteProvider(context.Background(), name); err != nil {
+		// 检查是否是"not found"错误
+		if containsString(err.Error(), "not found") {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusNoContent, nil)
+}
+
+// containsString 检查字符串是否包含子串
+func containsString(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && indexOfString(s, substr) >= 0)
+}
+
+func indexOfString(s, substr string) int {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
 }
 
 // RegisterRoutes 注册路由
