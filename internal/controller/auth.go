@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lucheng0127/courier/internal/middleware"
 	"github.com/lucheng0127/courier/internal/model"
 	"github.com/lucheng0127/courier/internal/service"
 )
@@ -24,6 +25,7 @@ func NewAuthController(authSvc *service.AuthService) *AuthController {
 func (c *AuthController) RegisterRoutes(r *gin.RouterGroup) {
 	auth := r.Group("/auth")
 	{
+		auth.POST("/register", middleware.RegisterRateLimit(), c.Register)
 		auth.POST("/login", c.Login)
 		auth.POST("/refresh", c.RefreshToken)
 	}
@@ -75,4 +77,49 @@ func (c *AuthController) RefreshToken(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, resp)
+}
+
+// Register 用户注册
+// POST /api/v1/auth/register
+func (c *AuthController) Register(ctx *gin.Context) {
+	var req model.RegisterRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"message": err.Error(),
+			"type":    "invalid_request_error",
+		})
+		return
+	}
+
+	user, err := c.authSvc.Register(ctx.Request.Context(), &req)
+	if err != nil {
+		if err.Error() == "email already exists" {
+			ctx.JSON(http.StatusConflict, gin.H{
+				"message": "Email already exists",
+				"type":    "invalid_request_error",
+			})
+			return
+		}
+		if err.Error() == "password must be at least 8 characters" {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"message": "Password must be at least 8 characters",
+				"type":    "invalid_request_error",
+			})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Failed to create user",
+			"type":    "api_error",
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusCreated, model.RegisterResponse{
+		ID:        user.ID,
+		Name:      user.Name,
+		Email:     user.Email,
+		Role:      user.Role,
+		Status:    user.Status,
+		CreatedAt: user.CreatedAt,
+	})
 }

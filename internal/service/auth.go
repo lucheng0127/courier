@@ -82,6 +82,40 @@ func (s *AuthService) CreateUser(ctx context.Context, req *model.CreateUserReque
 	return user, nil
 }
 
+// Register 用户注册
+func (s *AuthService) Register(ctx context.Context, req *model.RegisterRequest) (*model.User, error) {
+	// 检查邮箱是否已存在
+	existingUser, err := s.userRepo.GetUserByEmail(ctx, req.Email)
+	if err == nil && existingUser != nil {
+		return nil, fmt.Errorf("email already exists")
+	}
+
+	// 验证密码强度（至少 8 个字符）
+	if len(req.Password) < 8 {
+		return nil, fmt.Errorf("password must be at least 8 characters")
+	}
+
+	// 哈希密码
+	passwordHash, err := passwordpkg.HashPassword(req.Password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	user := &model.User{
+		Name:         req.Name,
+		Email:        req.Email,
+		PasswordHash: passwordHash,
+		Role:         "user", // 注册用户默认为普通用户
+		Status:       "active",
+	}
+
+	if err := s.userRepo.CreateUser(ctx, user); err != nil {
+		return nil, fmt.Errorf("failed to create user: %w", err)
+	}
+
+	return user, nil
+}
+
 // CreateAPIKey 创建 API Key
 func (s *AuthService) CreateAPIKey(ctx context.Context, userID int64, req *model.CreateAPIKeyRequest) (*model.CreateAPIKeyResponse, error) {
 	// 验证用户存在且状态为 active
