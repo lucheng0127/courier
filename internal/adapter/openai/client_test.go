@@ -167,7 +167,8 @@ func TestDoChatRequest_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL, "test-key", 30)
+	// 使用包含 /v1 路径的 base URL，符合新的 base_url 配置要求
+	client := NewClient(server.URL+"/v1", "test-key", 30)
 
 	req := &ChatRequest{
 		Model:    "gpt-4",
@@ -287,7 +288,8 @@ func TestDoChatStreamRequest_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL, "test-key", 30)
+	// 使用包含 /v1 路径的 base URL，符合新的 base_url 配置要求
+	client := NewClient(server.URL+"/v1", "test-key", 30)
 
 	req := &ChatRequest{
 		Model:    "gpt-4",
@@ -328,7 +330,8 @@ func TestDoChatStreamRequest_ContextCancel(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL, "test-key", 30)
+	// 使用包含 /v1 路径的 base URL，符合新的 base_url 配置要求
+	client := NewClient(server.URL+"/v1", "test-key", 30)
 
 	req := &ChatRequest{
 		Model:    "gpt-4",
@@ -352,4 +355,68 @@ func TestDoChatStreamRequest_ContextCancel(t *testing.T) {
 	}
 
 	close(respChan)
+}
+
+// TestBuildChatURL 测试 buildChatURL 函数
+func TestBuildChatURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		baseURL  string
+		expected string
+	}{
+		{
+			name:     "标准 OpenAI 路径包含 /v1",
+			baseURL:  "https://api.openai.com/v1",
+			expected: "https://api.openai.com/v1/chat/completions",
+		},
+		{
+			name:     "智谱 GLM 非标准路径",
+			baseURL:  "https://open.bigmodel.cn/api/paas/v4",
+			expected: "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+		},
+		{
+			name:     "通义千问兼容模式路径",
+			baseURL:  "https://dashscope.aliyuncs.com/compatible-mode/v1",
+			expected: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+		},
+		{
+			name:     "已包含完整路径不重复添加",
+			baseURL:  "https://api.openai.com/v1/chat/completions",
+			expected: "https://api.openai.com/v1/chat/completions",
+		},
+		{
+			name:     "末尾有斜杠时去除",
+			baseURL:  "https://api.openai.com/v1/",
+			expected: "https://api.openai.com/v1/chat/completions",
+		},
+		{
+			name:     "末尾有多个斜杠时去除一个",
+			baseURL:  "https://api.openai.com/v1//",
+			expected: "https://api.openai.com/v1//chat/completions",
+		},
+		{
+			name:     "已包含完整路径且末尾有斜杠",
+			baseURL:  "https://api.openai.com/v1/chat/completions/",
+			expected: "https://api.openai.com/v1/chat/completions",
+		},
+		{
+			name:     "其他版本路径如 /v2",
+			baseURL:  "https://api.example.com/v2",
+			expected: "https://api.example.com/v2/chat/completions",
+		},
+		{
+			name:     "自定义路径前缀",
+			baseURL:  "https://api.example.com/custom/api/v3",
+			expected: "https://api.example.com/custom/api/v3/chat/completions",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := buildChatURL(tt.baseURL)
+			if result != tt.expected {
+				t.Errorf("buildChatURL(%q) = %q, want %q", tt.baseURL, result, tt.expected)
+			}
+		})
+	}
 }
