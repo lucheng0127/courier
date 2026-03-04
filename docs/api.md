@@ -531,7 +531,7 @@ Authorization: Bearer <jwt-token>
 
 **请求**：
 ```http
-POST /api/v1/providers/reload
+POST /api/v1/admin/providers/reload
 Authorization: Bearer <jwt-token>
 ```
 
