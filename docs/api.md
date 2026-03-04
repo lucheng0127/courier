@@ -388,7 +388,13 @@ Content-Type: application/json
 
 ### 查询 Provider 列表
 
-**权限**: Admin
+**权限**: 所有认证用户
+
+**查询参数**:
+- `enabled` (可选): 过滤条件
+  - `true`: 只返回已启用的 Provider
+  - `false`: 只返回已禁用的 Provider
+  - 不传参数: 返回所有 Provider
 
 **请求**：
 ```http
@@ -396,7 +402,29 @@ GET /api/v1/providers
 Authorization: Bearer <jwt-token>
 ```
 
-**响应**：
+**管理员响应**（完整信息）：
+```json
+{
+  "providers": [
+    {
+      "provider": {
+        "id": 1,
+        "name": "openai-main",
+        "type": "openai",
+        "base_url": "https://api.openai.com/v1",
+        "timeout": 60,
+        "enabled": true,
+        "fallback_models": ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"],
+        "created_at": "2026-03-03T00:00:00Z",
+        "updated_at": "2026-03-03T00:00:00Z"
+      },
+      "is_running": true
+    }
+  ]
+}
+```
+
+**普通用户响应**（简化信息）：
 ```json
 {
   "providers": [
@@ -404,13 +432,14 @@ Authorization: Bearer <jwt-token>
       "name": "openai-main",
       "type": "openai",
       "base_url": "https://api.openai.com/v1",
-      "timeout": 60,
       "enabled": true,
       "fallback_models": ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"]
     }
   ]
 }
 ```
+
+> **注意**: 普通用户响应不包含敏感信息如 `api_key`、`timeout`、`is_running` 等。
 
 ### 获取单个 Provider
 
@@ -429,6 +458,31 @@ Authorization: Bearer <jwt-token>
   "type": "openai"
 }
 ```
+
+### 获取 Provider 模型列表
+
+**权限**: 所有认证用户
+
+**请求**：
+```http
+GET /api/v1/providers/:name/models
+Authorization: Bearer <jwt-token>
+```
+
+**响应**：
+```json
+{
+  "name": "openai-main",
+  "type": "openai",
+  "models": [
+    "gpt-4o",
+    "gpt-4o-mini",
+    "gpt-3.5-turbo"
+  ]
+}
+```
+
+> **说明**: 模型列表来源于 Provider 配置中的 `fallback_models` 字段。
 
 ### 更新 Provider
 

@@ -38,7 +38,7 @@ services:
       INITIAL_ADMIN_PASSWORD: admin123456
       # 日志和迁移配置
       LOG_LEVEL: info
-      ENV: production
+      ENV: development
       AUTO_MIGRATE: "true"
     ports:
       - "8080:8080"
