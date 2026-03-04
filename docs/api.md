@@ -386,6 +386,16 @@ Content-Type: application/json
 }
 ```
 
+> **注意 base_url 配置**：
+> `base_url` 必须包含完整的 API 路径前缀。系统会在 base_url 后自动追加 `/chat/completions` 构建完整的请求路径。
+>
+> **常见 Provider 配置示例**：
+> - OpenAI: `base_url` 设为 `https://api.openai.com/v1`
+> - 智谱 GLM: `base_url` 设为 `https://open.bigmodel.cn/api/paas/v4`
+> - 通义千问: `base_url` 设为 `https://dashscope.aliyuncs.com/compatible-mode/v1`
+>
+> **错误示例**：如果 base_url 设为 `https://api.openai.com`（缺少 `/v1`），最终请求路径将变为 `https://api.openai.com/chat/completions`（错误）
+
 ### 查询 Provider 列表
 
 **权限**: 所有认证用户

@@ -30,26 +30,21 @@ func NewClient(baseURL, apiKey string, timeout int) *Client {
 
 // buildChatURL 智能构建聊天 API URL
 // 避免路径重复，支持多种 baseURL 格式：
-// - https://api.openai.com -> https://api.openai.com/v1/chat/completions
 // - https://api.openai.com/v1 -> https://api.openai.com/v1/chat/completions
 // - https://api.openai.com/v1/chat/completions -> https://api.openai.com/v1/chat/completions
-// - https://dashscope.aliyuncs.com/compatible-mode/v1 -> https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+// - https://open.bigmodel.cn/api/paas/v4 -> https://open.bigmodel.cn/api/paas/v4/chat/completions
+// base_url 应包含完整的 API 路径前缀（如 /v1、/api/paas/v4 等）
 func buildChatURL(baseURL string) string {
 	// 去除末尾的斜杠
 	baseURL = strings.TrimSuffix(baseURL, "/")
 
-	// 检查是否已经包含完整路径
+	// 检查是否已经包含完整路径，直接返回
 	if strings.HasSuffix(baseURL, "/chat/completions") {
 		return baseURL
 	}
 
-	// 检查是否以 /v1 结尾，如果是则直接追加 /chat/completions
-	if strings.HasSuffix(baseURL, "/v1") {
-		return baseURL + "/chat/completions"
-	}
-
-	// 默认追加 /v1/chat/completions
-	return baseURL + "/v1/chat/completions"
+	// 只添加 /chat/completions
+	return baseURL + "/chat/completions"
 }
 
 // ChatRequest OpenAI API 请求格式
