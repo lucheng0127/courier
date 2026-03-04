@@ -21,26 +21,18 @@ TBD - created by archiving change unify-api-and-jwt-auth. Update Purpose after a
 
 ### Requirement: Provider 管理 API 路径
 
-Provider 管理接口 SHALL 统一使用 `/api/v1/providers` 路径前缀。
+Provider 查询接口权限 SHALL 已调整，所有认证用户可访问。
 
-#### Scenario: Provider CRUD 路径
+#### Scenario: Provider 查询路径权限
 
-- **WHEN** 访问 Provider 管理接口
-- **THEN** 接口路径如下：
-  - `POST /api/v1/providers` - 创建 Provider
-  - `GET /api/v1/providers` - 列出所有 Provider
-  - `GET /api/v1/providers/:name` - 获取单个 Provider
-  - `PUT /api/v1/providers/:name` - 更新 Provider
-  - `DELETE /api/v1/providers/:name` - 删除 Provider
-
-#### Scenario: Provider 运维路径
-
-- **WHEN** 访问 Provider 运维接口
-- **THEN** 接口路径如下：
-  - `POST /api/v1/admin/providers/reload` - 重载所有 Provider
-  - `POST /api/v1/admin/providers/:name/reload` - 重载指定 Provider
-  - `POST /api/v1/admin/providers/:name/enable` - 启用 Provider
-  - `POST /api/v1/admin/providers/:name/disable` - 禁用 Provider
+- **WHEN** 访问 Provider 查询接口
+- **THEN** 接口路径和权限如下：
+  - `GET /api/v1/providers` - 列出所有 Provider（所有认证用户）
+  - `GET /api/v1/providers/:name/models` - 获取模型列表（所有认证用户）
+  - `GET /api/v1/providers/:name` - 获取单个 Provider（仅管理员）
+  - `POST /api/v1/providers` - 创建 Provider（仅管理员）
+  - `PUT /api/v1/providers/:name` - 更新 Provider（仅管理员）
+  - `DELETE /api/v1/providers/:name` - 删除 Provider（仅管理员）
 
 ### Requirement: 用户管理 API 路径
 
@@ -177,4 +169,14 @@ main.go 中的路由注册 SHALL 遵循统一的组织方式。
       // ...
   }
   ```
+
+### Requirement: Provider 模型列表 API 路径
+
+系统 SHALL 提供专门的接口获取 Provider 支持的模型列表。
+
+#### Scenario: 模型列表路径
+
+- **WHEN** 访问 Provider 模型列表接口
+- **THEN** 接口路径为 `GET /api/v1/providers/:name/models`
+- **AND** 所有认证用户可访问
 

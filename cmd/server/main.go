@@ -167,13 +167,20 @@ func setupRoutes(router *gin.Engine, providerSvc *service.ProviderService, authS
 	adminOnly := jwtAuth.Group("")
 	adminOnly.Use(middleware.RequireAdmin())
 
-	// Provider 管理（仅管理员）
+	// Provider 管理操作（仅管理员）
 	providerCtrl := controller.NewProviderController(providerSvc)
-	providerCtrl.RegisterRoutes(adminOnly)
+	adminOnly.POST("/providers", providerCtrl.CreateProvider)
+	adminOnly.PUT("/providers/:name", providerCtrl.UpdateProvider)
+	adminOnly.DELETE("/providers/:name", providerCtrl.DeleteProvider)
+	adminOnly.GET("/providers/:name", providerCtrl.GetProvider)
 
 	// Provider 运维（仅管理员）
 	reloadCtrl := controller.NewProviderReloadController(providerSvc)
 	reloadCtrl.RegisterRoutes(adminOnly)
+
+	// ========== Provider 查询操作（所有认证用户）==========
+	jwtAuth.GET("/providers", providerCtrl.ListProviders)
+	jwtAuth.GET("/providers/:name/models", providerCtrl.ListProviderModels)
 
 	// ========== 用户管理接口 ==========
 	// 管理员可管理所有用户，普通用户可查看自己、管理自己的 API Key
