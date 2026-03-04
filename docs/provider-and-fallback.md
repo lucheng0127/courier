@@ -471,9 +471,78 @@ jq -r '.fallback_count' logs.jsonl | awk '{count[$1]++} END {for (c in count) pr
 
 ### 查询 Provider 列表
 
+**权限**: 所有认证用户
+
 ```bash
+# 查询所有 Provider
 curl http://localhost:8080/api/v1/providers \
   -H "Authorization: Bearer $ACCESS_TOKEN"
+
+# 只查询已启用的 Provider
+curl http://localhost:8080/api/v1/providers?enabled=true \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+
+# 只查询已禁用的 Provider
+curl http://localhost:8080/api/v1/providers?enabled=false \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+**普通用户响应**（简化信息）：
+```json
+{
+  "providers": [
+    {
+      "name": "openai-main",
+      "type": "openai",
+      "base_url": "https://api.openai.com/v1",
+      "enabled": true,
+      "fallback_models": ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"]
+    }
+  ]
+}
+```
+
+**管理员响应**（完整信息）：
+```json
+{
+  "providers": [
+    {
+      "provider": {
+        "id": 1,
+        "name": "openai-main",
+        "type": "openai",
+        "base_url": "https://api.openai.com/v1",
+        "timeout": 60,
+        "enabled": true,
+        "fallback_models": ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"],
+        "created_at": "2026-03-03T00:00:00Z"
+      },
+      "is_running": true
+    }
+  ]
+}
+```
+
+### 查询 Provider 模型列表
+
+**权限**: 所有认证用户
+
+```bash
+curl http://localhost:8080/api/v1/providers/openai-main/models \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+**响应**：
+```json
+{
+  "name": "openai-main",
+  "type": "openai",
+  "models": [
+    "gpt-4o",
+    "gpt-4o-mini",
+    "gpt-3.5-turbo"
+  ]
+}
 ```
 
 ### 更新 Provider

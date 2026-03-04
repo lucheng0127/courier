@@ -53,8 +53,13 @@ func (s *ProviderService) GetProvider(name string) (adapter.Provider, error) {
 	return provider, nil
 }
 
+// GetProviderByName 获取 Provider 配置（从数据库）
+func (s *ProviderService) GetProviderByName(ctx context.Context, name string) (*model.Provider, error) {
+	return s.repo.GetByName(ctx, name)
+}
+
 // ListProviders 列出所有 Provider 及状态
-func (s *ProviderService) ListProviders(ctx context.Context) ([]*ProviderInfo, error) {
+func (s *ProviderService) ListProviders(ctx context.Context, enabledFilter *bool) ([]*ProviderInfo, error) {
 	providers, err := s.repo.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list providers: %w", err)
@@ -62,6 +67,11 @@ func (s *ProviderService) ListProviders(ctx context.Context) ([]*ProviderInfo, e
 
 	var infos []*ProviderInfo
 	for _, p := range providers {
+		// 应用 enabled 过滤
+		if enabledFilter != nil && p.Enabled != *enabledFilter {
+			continue
+		}
+
 		instance, ok := adapter.GetProvider(p.Name)
 		info := &ProviderInfo{
 			Provider:  p,

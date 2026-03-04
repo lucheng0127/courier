@@ -64,7 +64,11 @@ func (m *MockProviderServiceForUpdate) GetProvider(name string) (adapter.Provide
 	return &MockProvider{name: name, typ: "openai"}, nil
 }
 
-func (m *MockProviderServiceForUpdate) ListProviders(ctx context.Context) ([]*service.ProviderInfo, error) {
+func (m *MockProviderServiceForUpdate) GetProviderByName(ctx context.Context, name string) (*model.Provider, error) {
+	return &model.Provider{Name: name, Type: "openai"}, nil
+}
+
+func (m *MockProviderServiceForUpdate) ListProviders(ctx context.Context, enabledFilter *bool) ([]*service.ProviderInfo, error) {
 	return nil, nil
 }
 
