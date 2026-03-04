@@ -161,24 +161,16 @@ func (c *ChatController) getFallbackModels(ctx *gin.Context, modelInfo *service.
 		return []string{modelInfo.ModelName}
 	}
 
-	// 验证请求的模型是否在 Fallback 列表中
-	found := false
-	for _, m := range fallbackModels {
-		if m == modelInfo.ModelName {
-			found = true
-			break
-		}
-	}
-
-	if found {
-		// 使用配置的 Fallback 列表
-		return fallbackModels
-	}
-
-	// 请求的模型不在列表中，将当前模型作为第一个，然后是 Fallback 列表
+	// 构建最终的模型列表，确保用户指定的模型始终在第一位
 	result := make([]string, 0, len(fallbackModels)+1)
 	result = append(result, modelInfo.ModelName)
-	result = append(result, fallbackModels...)
+
+	// 将 fallback 列表中除用户指定的模型外的其他模型添加到列表中
+	for _, m := range fallbackModels {
+		if m != modelInfo.ModelName {
+			result = append(result, m)
+		}
+	}
 	return result
 }
 
