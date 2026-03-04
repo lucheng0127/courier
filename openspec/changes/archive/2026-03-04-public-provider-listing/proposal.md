@@ -1,10 +1,6 @@
 # public-provider-listing 变更提案
 
-## 概述
-
-允许普通用户查看可用的 Provider 列表及其支持的模型列表，以便用户了解系统支持的模型选项。
-
-## 背景与动机
+## Why
 
 当前 `GET /api/v1/providers` 接口只允许管理员访问，普通用户无法查看系统中有哪些 Provider 可用，也不清楚各个 Provider 支持哪些模型。这限制了用户对系统能力的了解。
 
@@ -13,7 +9,7 @@
 2. 通过单独的接口查看每个 Provider 支持的模型列表
 3. 更好地选择合适的模型进行 API 调用
 
-## 变更范围
+## What Changes
 
 ### 涉及的能力 (Capabilities)
 
