@@ -49,11 +49,11 @@ func TestAdapter_Chat_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	// 创建 Provider 配置
+	// 创建 Provider 配置（使用包含 /v1 路径的 base URL）
 	provider := &model.Provider{
 		Name:     "test-vllm",
 		Type:     "vllm",
-		BaseURL:  server.URL,
+		BaseURL:  server.URL + "/v1",
 		Timeout:  30,
 		Enabled:  true,
 	}
