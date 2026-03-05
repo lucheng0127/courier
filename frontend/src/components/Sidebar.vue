@@ -7,6 +7,7 @@ import {
   BlockOutlined,
   CloudServerOutlined,
   ApiOutlined,
+  MessageOutlined,
   SettingOutlined
 } from '@ant-design/icons-vue'
 import { useAuthStore } from '@/stores/auth'
@@ -47,8 +48,13 @@ const menuItems: MenuItem[] = [
     key: 'api-keys',
     icon: ApiOutlined,
     label: 'API Keys',
-    path: '/api-keys',
-    requiredRole: 'admin'
+    path: '/api-keys'
+  },
+  {
+    key: 'chat',
+    icon: MessageOutlined,
+    label: 'Chat',
+    path: '/chat'
   },
   {
     key: 'settings',
@@ -78,6 +84,7 @@ const selectedKeys = computed(() => {
   if (path.startsWith('/models')) return ['models']
   if (path.startsWith('/providers')) return ['providers']
   if (path.startsWith('/api-keys')) return ['api-keys']
+  if (path.startsWith('/chat')) return ['chat']
   if (path.startsWith('/settings')) return ['settings']
   return []
 })

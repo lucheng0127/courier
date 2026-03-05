@@ -115,3 +115,58 @@ export interface UsageResponse {
   page: number
   page_size: number
 }
+
+// Chat 消息类型
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+}
+
+// Chat 请求类型
+export interface ChatRequest {
+  model: string
+  messages: ChatMessage[]
+  temperature?: number
+  max_tokens?: number
+  stream: boolean
+}
+
+// Chat 响应类型
+export interface ChatResponse {
+  id: string
+  object: string
+  created: number
+  model: string
+  choices: Array<{
+    index: number
+    message: ChatMessage
+    finish_reason: string
+  }>
+  usage: {
+    prompt_tokens: number
+    completion_tokens: number
+    total_tokens: number
+  }
+}
+
+// Chat 流式响应类型
+export interface ChatStreamChunk {
+  id: string
+  object: string
+  created: number
+  model: string
+  choices: Array<{
+    index: number
+    delta: {
+      content?: string
+      role?: string
+    }
+  }>
+}
+
+// Provider 模型类型（用于获取 Provider 的模型列表）
+export interface ProviderModel {
+  name: string
+  id: string
+  enabled: boolean
+}
