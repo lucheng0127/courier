@@ -21,11 +21,6 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('refresh_token', newToken.refresh_token)
   }
 
-  const setUser = (newUser: User) => {
-    user.value = newUser
-    localStorage.setItem('user', JSON.stringify(newUser))
-  }
-
   const register = async (name: string, email: string, password: string) => {
     await registerApi({ name, email, password })
     // 注册成功后不自动登录，需要用户手动登录
@@ -37,9 +32,10 @@ export const useAuthStore = defineStore('auth', () => {
     setToken(tokenData)
     // 设置临时用户信息（因为 API 不返回用户信息）
     // 后续可以通过其他接口获取完整用户信息
+    const emailName = email.split('@')[0] || email
     user.value = {
       id: 0, // 临时 ID
-      name: email.split('@')[0], // 从邮箱提取用户名
+      name: emailName, // 从邮箱提取用户名
       email: email,
       role: 'user', // 默认角色
       status: 'active',
