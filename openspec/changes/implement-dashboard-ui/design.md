@@ -1,47 +1,48 @@
-# Web UI 设计文档
+# Dashboard UI 设计文档
 
 ## Context
 
-Courier 项目当前是一个纯后端的 LLM Gateway 服务，提供 RESTful API 接口。为了提升用户体验，需要添加一个 Web 管理界面，让用户可以通过浏览器进行登录和 API Key 管理操作。
+Courier 项目当前是一个纯后端的 LLM Gateway 服务，提供 RESTful API 接口。为了提升用户体验，需要添加一个 Web Dashboard 前端项目，让用户可以通过浏览器进行注册、登录和查看系统概览。
 
 **技术约束**：
 - 必须通过 Docker Compose 部署
 - 使用 nginx 部署编译后的静态文件
-- 界面风格简洁、模块化、卡片式组件、中性色配色
+- 前端设计遵循 `frontend/design/` 中的设计文档
 
 **利益相关者**：
-- 最终用户：需要通过界面管理 API Key
+- 最终用户：需要通过界面注册账户、登录系统、查看使用统计
 - 运维人员：需要通过 Docker Compose 一键部署
 
 ## Goals / Non-Goals
 
 ### Goals
+- 提供用户注册功能
 - 提供用户登录和注销功能
-- 提供 API Key 管理功能（列表、创建、撤销）
+- 提供 Dashboard 概览页面（使用统计、Provider 状态）
 - 通过 Docker Compose 与后端服务一起部署
-- 简洁、现代的 UI 设计
+- 现代化的 UI 设计（参考 Vercel、Stripe Console）
 
 ### Non-Goals
+- 不实现 API Key 管理界面（后续阶段）
 - 不实现 Provider 管理界面（后续阶段）
-- 不实现使用统计界面（后续阶段）
+- 不实现详细的使用统计页面（后续阶段）
 - 不实现聊天界面（后续阶段）
-- 不实现用户注册界面（用户通过 API 注册）
 
 ## Decisions
 
 ### 1. 前端技术栈
 
-**决策**：使用 Vue 3 + View UI (iView) + Vite
+**决策**：使用 Vue 3 + TypeScript + Ant Design Vue + Vite
 
 **理由**：
-- Vue 3 是成熟的渐进式框架，学习曲线平缓
-- View UI (iView) 是成熟的 Vue UI 组件库，提供丰富的组件
+- Vue 3 是成熟的渐进式框架，Composition API 提供更好的类型推导
+- Ant Design Vue 是企业级 UI 组件库，设计风格现代、组件丰富
 - Vite 提供快速的开发体验和构建速度
-- 用户明确要求使用 iView
+- TypeScript 提供类型安全，降低维护成本
 
 **替代方案**：
-- React + Ant Design：同样可行，但用户要求使用 iView
-- 纯原生 JavaScript：开发效率低，不利于维护
+- View UI Plus：同样可行，但 Ant Design Vue 生态更活跃
+- React + Ant Design：同样可行，但团队更熟悉 Vue
 
 ### 2. 部署架构
 
@@ -93,11 +94,12 @@ Courier 项目当前是一个纯后端的 LLM Gateway 服务，提供 RESTful AP
 **理由**：
 - Vue 3 官方推荐的状态管理库
 - 比 Vuex 更简洁、类型友好
-- 适合管理用户认证状态、API Key 列表等全局状态
+- 适合管理用户认证状态、使用统计数据等全局状态
 
 **状态结构**：
 ```typescript
 {
+  // auth store
   user: {
     id: number,
     name: string,
@@ -109,59 +111,74 @@ Courier 项目当前是一个纯后端的 LLM Gateway 服务，提供 RESTful AP
     refreshToken: string,
     expiresAt: number
   },
-  apiKeys: Array<{
-    id: number,
-    key_prefix: string,
+
+  // dashboard store
+  stats: {
+    totalRequests: number,
+    totalTokens: number,
+    successRate: number,
+    avgLatency: number
+  },
+  providers: Array<{
     name: string,
+    type: string,
+    enabled: boolean,
+    is_running: boolean
+  }>,
+  recentActivity: Array<{
+    timestamp: string,
+    model: string,
     status: string,
-    created_at: string,
-    last_used_at: string
+    tokens: number
   }>
 }
 ```
 
 ### 5. 路由设计
 
-**决策**：使用 Vue Router，基于角色控制路由访问
+**决策**：使用 Vue Router，基于认证状态控制路由访问
 
 **路由表**：
 ```typescript
 {
   path: '/login',
   name: 'Login',
-  component: LoginView
+  component: LoginView,
+  meta: { requiresAuth: false }
+}
+{
+  path: '/register',
+  name: 'Register',
+  component: RegisterView,
+  meta: { requiresAuth: false }
 }
 {
   path: '/',
-  redirect: '/api-keys'
-}
-{
-  path: '/api-keys',
-  name: 'APIKeys',
-  component: APIKeysView,
+  name: 'Dashboard',
+  component: DashboardView,
   meta: { requiresAuth: true }
 }
 ```
 
 ### 6. UI 设计规范
 
-**颜色方案**（中性色）：
-- 主色：`#515a6e` (View UI 默认主色)
-- 背景：`#f8f8f9` (浅灰背景)
-- 卡片背景：`#ffffff` (白色)
-- 边框：`#dcdee2` (浅灰边框)
-- 文字：`#515a6e` (深灰)
+遵循 `frontend/design/ui-style.md` 中的设计规范：
+
+**颜色方案**：
+- 主色：`#10A37F` (OpenAI 绿)
+- 背景：`#F9FAFB` (浅灰背景)
+- 卡片背景：`#FFFFFF` (白色)
+- 边框：`#E5E7EB` (浅灰边框)
+- 文字：`#111827` (深灰)
 
 **布局结构**：
-- 左侧导航栏（宽度 ~200px）
-- 顶部 Header（包含用户信息和注销按钮）
-- 主内容区域（卡片式内容）
+- 顶部导航栏（60px）：Logo + 用户菜单
+- 主内容区域：Dashboard 卡片
 
 **组件风格**：
-- 使用 View UI 的 Card 组件作为主要容器
-- 表格使用 Table 组件展示 API Key 列表
-- 表单使用 Form 组件
-- 按钮使用 Button 组件
+- 使用 Ant Design Vue 的组件
+- 自定义样式覆盖以匹配设计规范
+- 卡片式布局，圆角 12px
 
 ## Risks / Trade-offs
 
@@ -180,12 +197,20 @@ Courier 项目当前是一个纯后端的 LLM Gateway 服务，提供 RESTful AP
 - 刷新失败时提示用户重新登录
 
 ### 风险 3：构建产物体积
-**风险**：前端打包后体积可能较大
+**风险**：前端打包后体积可能较大（Ant Design Vue）
 
 **缓解措施**：
 - 使用 Vite 的代码分割
-- 按需加载 View UI 组件
+- 按需导入 Ant Design Vue 组件
 - 生产环境启用 gzip 压缩
+
+### 风险 4：API 依赖
+**风险**：Dashboard 首页依赖使用统计 API，如果数据量大可能影响性能
+
+**缓解措施**：
+- 使用分页和聚合查询
+- 添加加载状态和错误处理
+- 考虑缓存策略
 
 ## Migration Plan
 
@@ -195,13 +220,15 @@ Courier 项目当前是一个纯后端的 LLM Gateway 服务，提供 RESTful AP
    ```bash
    cd frontend
    npm create vite@latest . -- --template vue-ts
-   npm install view-ui-plus axios pinia vue-router
+   npm install ant-design-vue axios pinia vue-router
+   npm install @ant-design/icons-vue
    ```
 
 2. **开发页面组件**
+   - 注册页面
    - 登录页面
-   - 主布局（导航栏 + 内容区）
-   - API Key 管理页面
+   - Dashboard 首页
+   - 主布局组件
 
 3. **配置 nginx**
    - 静态文件服务
@@ -224,11 +251,11 @@ Courier 项目当前是一个纯后端的 LLM Gateway 服务，提供 RESTful AP
 
 ## Open Questions
 
-1. **前端是否需要支持国际化？**
+1. **Dashboard 数据刷新频率？**
+   - 建议页面加载时获取一次，用户可手动刷新
+
+2. **是否需要实时更新？**
+   - 当前方案不支持，后续可考虑 WebSocket
+
+3. **是否需要支持多语言？**
    - 当前方案不支持，后续可添加 vue-i18n
-
-2. **是否需要主题切换功能？**
-   - 当前方案只支持浅色主题
-
-3. **API Key 创建后是否需要复制到剪贴板提示？**
-   - 建议添加，提升用户体验
