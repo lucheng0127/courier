@@ -1,0 +1,83 @@
+routes:
+  # 公共路由（无需认证）
+  - path: /login
+    page: login
+    auth: false
+
+  - path: /register
+    page: register
+    auth: false
+
+  # 受保护路由（需要认证）
+  - path: /
+    page: dashboard
+    auth: true
+
+  - path: /dashboard
+    page: dashboard
+    auth: true
+    redirect: /
+
+  - path: /providers
+    page: providers
+    auth: true
+    role: admin
+
+  - path: /providers/new
+    page: providers
+    auth: true
+    role: admin
+    modal: provider_form
+
+  - path: /providers/:name/edit
+    page: providers
+    auth: true
+    role: admin
+    modal: provider_form
+
+  - path: /models
+    page: models
+    auth: true
+
+  - path: /api-keys
+    page: api_keys
+    auth: true
+
+  - path: /api-keys/new
+    page: api_keys
+    auth: true
+    modal: create_api_key
+
+  - path: /usage
+    page: usage
+    auth: true
+
+  - path: /users
+    page: users
+    auth: true
+    role: admin
+
+  - path: /users/:id/edit
+    page: users
+    auth: true
+    role: admin
+    modal: user_edit
+
+  - path: /settings
+    page: settings
+    auth: true
+
+  # 重定向和错误处理
+  - path: /unauthorized
+    page: error
+    error_type: unauthorized
+
+  - path: /404
+    page: error
+    error_type: not_found
+
+  # 默认重定向
+  - path: /*
+    redirect: /
+    condition: !authenticated
+    final_redirect: /login
