@@ -30,18 +30,43 @@ export const useAuthStore = defineStore('auth', () => {
   const login = async (email: string, password: string) => {
     const tokenData = await loginApi({ email, password })
     setToken(tokenData)
-    // 设置临时用户信息（因为 API 不返回用户信息）
-    // 后续可以通过其他接口获取完整用户信息
+
+    // 从 JWT token 中解析用户信息
+    const payload = parseJWT(tokenData.access_token)
+    console.log('[DEBUG] JWT Payload:', payload)
+
+    // 设置用户信息
     const emailName = email.split('@')[0] || email
     user.value = {
-      id: 0, // 临时 ID
-      name: emailName, // 从邮箱提取用户名
-      email: email,
-      role: 'user', // 默认角色
+      id: payload.user_id || 0,
+      name: payload.user_email ? payload.user_email.split('@')[0] : emailName,
+      email: payload.user_email || email,
+      role: payload.user_role || 'user',
       status: 'active',
       created_at: new Date().toISOString()
     }
+    console.log('[DEBUG] User after login:', user.value)
     localStorage.setItem('user', JSON.stringify(user.value))
+  }
+
+  // 解析 JWT token
+  const parseJWT = (token: string) => {
+    try {
+      const parts = token.split('.')
+      if (parts.length < 2) return {}
+
+      const base64Url = parts[1]
+      if (!base64Url) return {}
+
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+      }).join(''))
+      return JSON.parse(jsonPayload)
+    } catch (e) {
+      console.error('Failed to parse JWT:', e)
+      return {}
+    }
   }
 
   const logout = () => {
@@ -66,6 +91,9 @@ export const useAuthStore = defineStore('auth', () => {
     const savedRefreshToken = localStorage.getItem('refresh_token')
     const savedUser = localStorage.getItem('user')
 
+    console.log('[DEBUG] restoreState - savedToken:', !!savedToken)
+    console.log('[DEBUG] restoreState - savedUser:', savedUser)
+
     if (savedToken && savedRefreshToken) {
       token.value = {
         access_token: savedToken,
@@ -78,6 +106,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (savedUser) {
       try {
         user.value = JSON.parse(savedUser)
+        console.log('[DEBUG] restoreState - parsed user:', user.value)
       } catch (e) {
         console.error('Failed to parse saved user:', e)
       }

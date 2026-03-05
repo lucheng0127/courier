@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { Card, Row, Col, Statistic, Table, Tag, Button, Spin } from 'ant-design-vue'
 import {
   ReloadOutlined,
@@ -8,11 +7,10 @@ import {
   ArrowDownOutlined
 } from '@ant-design/icons-vue'
 import { useDashboardStore } from '@/stores/dashboard'
-import { useAuthStore } from '@/stores/auth'
+import Sidebar from '@/components/Sidebar.vue'
+import Topbar from '@/components/Topbar.vue'
 
-const router = useRouter()
 const dashboardStore = useDashboardStore()
-const authStore = useAuthStore()
 
 const loading = ref(false)
 
@@ -58,11 +56,6 @@ const loadData = async () => {
   }
 }
 
-const handleLogout = () => {
-  authStore.logout()
-  router.push('/login')
-}
-
 onMounted(() => {
   loadData()
 })
@@ -82,16 +75,11 @@ const formatLatency = (ms: number) => {
 
 <template>
   <div class="dashboard-layout">
+    <!-- Sidebar -->
+    <Sidebar />
+
     <!-- Topbar -->
-    <div class="topbar">
-      <div class="topbar-left">
-        <h1 class="logo">Courier LLM Gateway</h1>
-      </div>
-      <div class="topbar-right">
-        <span class="user-email">{{ authStore.userEmail }}</span>
-        <a-button type="text" @click="handleLogout">注销</a-button>
-      </div>
-    </div>
+    <Topbar />
 
     <!-- Main Content -->
     <div class="main-content">
@@ -206,38 +194,11 @@ const formatLatency = (ms: number) => {
   background-color: #F9FAFB;
 }
 
-.topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  height: 60px;
-  padding: 0 24px;
-  background: #FFFFFF;
-  border-bottom: 1px solid #E5E7EB;
-}
-
-.topbar-left .logo {
-  font-size: 18px;
-  font-weight: 600;
-  color: #111827;
-  margin: 0;
-}
-
-.topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.user-email {
-  color: #6B7280;
-  font-size: 14px;
-}
-
 .main-content {
   padding: 24px;
   max-width: 1400px;
-  margin: 0 auto;
+  margin-left: 240px;
+  margin-top: 60px;
 }
 
 .stats-row {
@@ -297,20 +258,13 @@ const formatLatency = (ms: number) => {
 
 /* 响应式设计 */
 @media (max-width: 640px) {
-  .topbar {
-    padding: 0 16px;
-  }
-
-  .topbar-left .logo {
-    font-size: 16px;
-  }
-
   .main-content {
     padding: 16px;
+    margin-left: 0;
   }
 
-  .user-email {
-    display: none;
+  .topbar {
+    left: 0;
   }
 }
 </style>

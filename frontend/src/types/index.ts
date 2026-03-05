@@ -26,7 +26,13 @@ export interface ApiKey {
   last_used_at?: string
 }
 
-// Provider 类型
+// Provider 类型（后端 ProviderInfo 结构）
+export interface ProviderInfo {
+  provider: Provider
+  is_running: boolean
+}
+
+// Provider 类型（数据库结构）
 export interface Provider {
   id: number
   name: string
@@ -34,10 +40,28 @@ export interface Provider {
   base_url: string
   timeout: number
   enabled: boolean
-  is_running?: boolean
   fallback_models: string[]
   created_at: string
   updated_at?: string
+  api_key?: string
+}
+
+// Provider 表单类型
+export interface ProviderForm {
+  name: string
+  type: string
+  base_url: string
+  timeout: number
+  api_key?: string
+  enabled: boolean
+  fallback_models: string[]
+}
+
+// Model 信息类型
+export interface ModelInfo {
+  name: string
+  id: string
+  enabled: boolean
 }
 
 // 使用记录类型
