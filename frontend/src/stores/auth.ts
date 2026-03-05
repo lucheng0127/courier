@@ -9,7 +9,7 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref<Token | null>(null)
 
   // Getters
-  const isAuthenticated = computed(() => !!token.value && !!user.value)
+  const isAuthenticated = computed(() => !!token.value)
   const userEmail = computed(() => user.value?.email || '')
   const userName = computed(() => user.value?.name || '')
   const userRole = computed(() => user.value?.role || 'user')
@@ -27,16 +27,25 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const register = async (name: string, email: string, password: string) => {
-    const userData = await registerApi({ name, email, password })
-    setUser(userData)
+    await registerApi({ name, email, password })
+    // 注册成功后不自动登录，需要用户手动登录
+    // 不设置 user 和 token 状态
   }
 
   const login = async (email: string, password: string) => {
     const tokenData = await loginApi({ email, password })
     setToken(tokenData)
-    // 获取用户信息
-    // 注意：当前 API 没有返回 user_id，需要从 token 中解析或使用其他方式
-    // 暂时先不获取用户信息，后续可以改进
+    // 设置临时用户信息（因为 API 不返回用户信息）
+    // 后续可以通过其他接口获取完整用户信息
+    user.value = {
+      id: 0, // 临时 ID
+      name: email.split('@')[0], // 从邮箱提取用户名
+      email: email,
+      role: 'user', // 默认角色
+      status: 'active',
+      created_at: new Date().toISOString()
+    }
+    localStorage.setItem('user', JSON.stringify(user.value))
   }
 
   const logout = () => {
