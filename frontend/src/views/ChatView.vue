@@ -4,7 +4,6 @@ import { message } from 'ant-design-vue'
 import { SendOutlined, RobotOutlined, UserOutlined } from '@ant-design/icons-vue'
 import { useChatStore } from '@/stores/chat'
 import { useApiKeyStore } from '@/stores/api-keys'
-import { useAuthStore } from '@/stores/auth'
 import { getProviders } from '@/api/providers'
 import Sidebar from '@/components/Sidebar.vue'
 import Topbar from '@/components/Topbar.vue'
@@ -12,30 +11,14 @@ import type { ProviderInfo } from '@/types'
 
 const chatStore = useChatStore()
 const apiKeyStore = useApiKeyStore()
-const authStore = useAuthStore()
 
 // Provider 和 Model 列表
 const providers = ref<ProviderInfo[]>([])
 const loadingProviders = ref(false)
-const hasApiKey = ref(false)
-const loadingApiKeyCheck = ref(true)
 
 // 输入相关
 const inputMessage = ref('')
 const messagesContainerRef = ref<HTMLElement>()
-
-// 检查 API Key
-const checkApiKey = async () => {
-  loadingApiKeyCheck.value = true
-  try {
-    await apiKeyStore.fetchApiKeys(authStore.user!.id)
-    hasApiKey.value = apiKeyStore.hasActiveApiKey()
-  } catch (error) {
-    console.error('Failed to check API keys:', error)
-  } finally {
-    loadingApiKeyCheck.value = false
-  }
-}
 
 // 加载 Provider 列表
 const loadProviders = async () => {
@@ -63,38 +46,53 @@ const handleSend = async () => {
     return
   }
 
-  if (!hasApiKey.value) {
-    message.warning('请先创建 API Key')
-    return
-  }
-
-  // 获取第一个可用的 API Key
-  const activeApiKey = apiKeyStore.getFirstActiveApiKey()
-  if (!activeApiKey) {
-    message.error('没有可用的 API Key')
-    return
-  }
-
-  // 尝试从 localStorage 获取完整的 API Key
-  const fullApiKey = localStorage.getItem(`api_key_${activeApiKey.id}`)
-
-  if (!fullApiKey) {
-    message.warning({
-      content: '此 API Key 是在更新前创建的，无法用于聊天。请删除旧 Key 并重新创建一个新的 API Key。',
-      duration: 5
-    })
-    return
-  }
-
   inputMessage.value = ''
 
   try {
-    await chatStore.sendMessage(fullApiKey, content)
+    // 优先使用 JWT Token，如果不可用则使用 API Key
+    const jwtToken = localStorage.getItem('access_token')
+    console.log('[Chat] JWT Token exists:', !!jwtToken)
+
+    let authCredential = ''
+
+    if (jwtToken) {
+      // 验证 JWT token 格式
+      if (!jwtToken.startsWith('eyJ')) {
+        message.error('JWT Token 格式无效，请重新登录')
+        return
+      }
+      // 使用 JWT Token 进行认证
+      authCredential = jwtToken
+      console.log('[Chat] Using JWT Token for authentication')
+    } else {
+      // 回退到使用 API Key
+      const activeApiKey = apiKeyStore.getFirstActiveApiKey()
+      if (!activeApiKey) {
+        message.error('没有可用的认证方式（JWT Token 或 API Key）。请先登录或创建 API Key。')
+        return
+      }
+
+      // 尝试从 localStorage 获取完整的 API Key
+      const fullApiKey = localStorage.getItem(`api_key_${activeApiKey.id}`)
+      if (!fullApiKey) {
+        message.warning({
+          content: '此 API Key 是在更新前创建的，无法用于聊天。请删除旧 Key 并重新创建一个新的 API Key。',
+          duration: 5
+        })
+        return
+      }
+      authCredential = fullApiKey
+      console.log('[Chat] Using API Key for authentication')
+    }
+
+    console.log('[Chat] Sending message with model:', chatStore.fullModelIdentifier)
+    await chatStore.sendMessage(authCredential, content)
 
     // 滚动到底部
     await nextTick()
     scrollToBottom()
   } catch (error: any) {
+    console.error('[Chat] Send message error:', error)
     message.error('发送失败：' + (error.message || '未知错误'))
   }
 }
@@ -130,18 +128,12 @@ const handleModelChange = (value: string) => {
   chatStore.selectModel(value)
 }
 
-// 跳转到 API Keys 页面
-const goToApiKeys = () => {
-  window.location.href = '/api-keys'
-}
-
 // 清空对话
 const handleClear = () => {
   chatStore.clearMessages()
 }
 
 onMounted(async () => {
-  await checkApiKey()
   await loadProviders()
 })
 </script>
@@ -152,24 +144,8 @@ onMounted(async () => {
     <Topbar />
 
     <div class="main-content">
-      <!-- 无 API Key 提示 -->
-      <div v-if="!loadingApiKeyCheck && !hasApiKey" class="no-api-key-container">
-        <a-card class="no-api-key-card">
-          <div class="no-api-key-content">
-            <div class="no-api-key-icon">
-              <RobotOutlined :style="{ fontSize: '64px', color: '#9CA3AF' }" />
-            </div>
-            <h2 class="no-api-key-title">您还没有创建 API Key</h2>
-            <p class="no-api-key-description">请先创建 API Key 再进行对话</p>
-            <a-button type="primary" size="large" @click="goToApiKeys">
-              创建 API Key
-            </a-button>
-          </div>
-        </a-card>
-      </div>
-
       <!-- 聊天主界面 -->
-      <div v-else class="chat-container">
+      <div class="chat-container">
         <!-- 顶部选择区域 -->
         <div class="chat-header">
           <div class="selector-group">
@@ -295,41 +271,6 @@ onMounted(async () => {
   margin-top: 60px;
   display: flex;
   flex-direction: column;
-}
-
-/* 无 API Key 提示 */
-.no-api-key-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-}
-
-.no-api-key-card {
-  border-radius: 12px;
-  text-align: center;
-  max-width: 400px;
-}
-
-.no-api-key-content {
-  padding: 24px;
-}
-
-.no-api-key-icon {
-  margin-bottom: 24px;
-}
-
-.no-api-key-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: #111827;
-  margin-bottom: 12px;
-}
-
-.no-api-key-description {
-  font-size: 14px;
-  color: #6B7280;
-  margin-bottom: 24px;
 }
 
 /* 聊天容器 */

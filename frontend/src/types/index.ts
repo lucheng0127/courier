@@ -21,7 +21,7 @@ export interface ApiKey {
   id: number
   key_prefix: string
   name: string
-  status: 'active' | 'disabled'
+  status: 'active' | 'disabled' | 'revoked'
   created_at: string
   last_used_at?: string
 }

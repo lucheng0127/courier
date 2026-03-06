@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { PlusOutlined, CopyOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, CopyOutlined, CheckCircleOutlined, StopOutlined } from '@ant-design/icons-vue'
 import { useApiKeyStore } from '@/stores/api-keys'
 import { useAuthStore } from '@/stores/auth'
 import Sidebar from '@/components/Sidebar.vue'
@@ -18,7 +18,7 @@ const columns = [
   { title: '状态', dataIndex: 'status', key: 'status', width: 120 },
   { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 180 },
   { title: '最后使用时间', dataIndex: 'last_used_at', key: 'last_used_at', width: 180 },
-  { title: '操作', key: 'actions', width: 120, fixed: 'right' }
+  { title: '操作', key: 'actions', width: 200, fixed: 'right' }
 ]
 
 // 创建表单相关
@@ -67,12 +67,41 @@ const handleSubmit = async () => {
   }
 }
 
+// 启用 API Key
+const handleEnable = async (record: ApiKey) => {
+  try {
+    await apiKeyStore.enableKey(authStore.user!.id, record.id)
+    message.success('API Key 已启用')
+  } catch (error: any) {
+    message.error('启用失败: ' + (error.message || '未知错误'))
+  }
+}
+
+// 禁用 API Key
+const handleDisable = (record: ApiKey) => {
+  Modal.confirm({
+    title: '确认禁用',
+    content: `确定要禁用 API Key "${record.name}" 吗？禁用后将无法使用此 Key 进行 API 调用。`,
+    okText: '确定',
+    cancelText: '取消',
+    onOk: async () => {
+      try {
+        await apiKeyStore.disableKey(authStore.user!.id, record.id)
+        message.success('API Key 已禁用')
+      } catch (error: any) {
+        message.error('禁用失败: ' + (error.message || '未知错误'))
+      }
+    }
+  })
+}
+
 // 删除 API Key
 const handleDelete = (record: ApiKey) => {
   Modal.confirm({
     title: '确认删除',
     content: `确定要删除 API Key "${record.name}" 吗？删除后无法恢复。`,
     okText: '确定',
+    okType: 'danger',
     cancelText: '取消',
     onOk: async () => {
       try {
@@ -132,7 +161,7 @@ onMounted(() => {
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'">
               <a-tag :color="record.status === 'active' ? 'success' : 'default'">
-                {{ record.status === 'active' ? '已启用' : '已禁用' }}
+                {{ record.status === 'active' ? '已启用' : record.status === 'disabled' ? '已禁用' : '已撤销' }}
               </a-tag>
             </template>
             <template v-else-if="column.key === 'created_at'">
@@ -143,6 +172,31 @@ onMounted(() => {
             </template>
             <template v-else-if="column.key === 'actions'">
               <a-space>
+                <!-- 启用按钮（仅在禁用状态显示） -->
+                <a-button
+                  v-if="record.status === 'disabled'"
+                  type="link"
+                  size="small"
+                  @click="handleEnable(record)"
+                >
+                  <template #icon>
+                    <CheckCircleOutlined />
+                  </template>
+                  启用
+                </a-button>
+                <!-- 禁用按钮（仅在启用状态显示） -->
+                <a-button
+                  v-if="record.status === 'active'"
+                  type="link"
+                  size="small"
+                  @click="handleDisable(record)"
+                >
+                  <template #icon>
+                    <StopOutlined />
+                  </template>
+                  禁用
+                </a-button>
+                <!-- 删除按钮（任何状态都显示） -->
                 <a-button
                   type="link"
                   size="small"
@@ -206,9 +260,11 @@ onMounted(() => {
             <div class="key-value">{{ fullKey }}</div>
             <a-button
               type="primary"
-              :icon="copied ? undefined : CopyOutlined"
               @click="copyFullKey"
             >
+              <template v-if="!copied" #icon>
+                <CopyOutlined />
+              </template>
               {{ copied ? '已复制' : '复制完整 Key' }}
             </a-button>
           </div>
@@ -313,3 +369,4 @@ onMounted(() => {
   }
 }
 </style>
+

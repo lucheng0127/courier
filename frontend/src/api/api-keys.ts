@@ -18,10 +18,34 @@ export const getApiKeys = (userId: number) => {
   }).then(res => res.api_keys)
 }
 
-// 删除 API Key
+// 启用 API Key
+export const enableApiKey = (userId: number, keyId: number) => {
+  return request<any, ApiKey>({
+    url: `/users/${userId}/api-keys/${keyId}/enable`,
+    method: 'PATCH'
+  })
+}
+
+// 禁用 API Key
+export const disableApiKey = (userId: number, keyId: number) => {
+  return request<any, ApiKey>({
+    url: `/users/${userId}/api-keys/${keyId}/disable`,
+    method: 'PATCH'
+  })
+}
+
+// 删除 API Key（硬删除）
 export const deleteApiKey = (userId: number, keyId: number) => {
   return request<any, void>({
     url: `/users/${userId}/api-keys/${keyId}`,
+    method: 'DELETE'
+  })
+}
+
+// 撤销 API Key（软删除，设置为 revoked 状态）
+export const revokeApiKey = (userId: number, keyId: number) => {
+  return request<any, void>({
+    url: `/users/${userId}/api-keys/${keyId}/revoke`,
     method: 'DELETE'
   })
 }

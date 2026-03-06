@@ -3,9 +3,22 @@ import { message } from 'ant-design-vue'
 import { useAuthStore } from '@/stores/auth'
 import router from '@/router'
 
+// 获取 API Base URL
+// 使用相对路径，由 Vite proxy (本地开发) 或 Nginx proxy (Docker) 处理
+const getBaseURL = () => {
+  // 如果环境变量设置了完整的 URL，使用它（用于特殊情况）
+  const envApiUrl = import.meta.env.VITE_API_BASE_URL
+  if (envApiUrl && (envApiUrl.startsWith('http://') || envApiUrl.startsWith('https://'))) {
+    return `${envApiUrl}/api/v1`
+  }
+
+  // 默认使用相对路径
+  return '/api/v1'
+}
+
 // 创建 axios 实例
 const request: AxiosInstance = axios.create({
-  baseURL: '/api/v1',
+  baseURL: getBaseURL(),
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json'

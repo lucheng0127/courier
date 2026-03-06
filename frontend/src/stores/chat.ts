@@ -66,7 +66,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  const sendMessage = async (apiKey: string, userMessage: string) => {
+  const sendMessage = async (authCredential: string, userMessage: string) => {
     if (!fullModelIdentifier.value) {
       throw new Error('Please select provider and model')
     }
@@ -83,7 +83,7 @@ export const useChatStore = defineStore('chat', () => {
     messages.value.push(assistantMsg)
 
     try {
-      const stream = await sendChatStream(apiKey, {
+      const stream = await sendChatStream(authCredential, {
         model: fullModelIdentifier.value,
         messages: messages.value.slice(0, -1), // 不包含刚添加的空消息
         temperature: 0.7,

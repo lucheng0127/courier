@@ -53,6 +53,9 @@ type UserRepository interface {
 
 	// UpdateKeyLastUsed 更新 API Key 最后使用时间
 	UpdateKeyLastUsed(ctx context.Context, id int64) error
+
+	// DeleteAPIKey 删除 API Key（硬删除）
+	DeleteAPIKey(ctx context.Context, id int64) error
 }
 
 // userRepository 用户数据访问实现
@@ -297,4 +300,14 @@ func (r *userRepository) UpdateKeyLastUsed(ctx context.Context, id int64) error 
 func HashAPIKey(apiKey string) string {
 	hash := sha256.Sum256([]byte(apiKey))
 	return fmt.Sprintf("%x", hash)
+}
+
+// DeleteAPIKey 删除 API Key（硬删除）
+func (r *userRepository) DeleteAPIKey(ctx context.Context, id int64) error {
+	query := `DELETE FROM api_keys WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete api key: %w", err)
+	}
+	return nil
 }
