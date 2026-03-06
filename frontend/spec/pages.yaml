@@ -1,0 +1,92 @@
+pages:
+  # 登录页
+  login:
+    path: /login
+    layout: centered
+    auth: false
+    components:
+      - LoginForm
+    navigation:
+      success: /
+
+  # 注册页
+  register:
+    path: /register
+    layout: centered
+    auth: false
+    components:
+      - RegisterForm
+    navigation:
+      success: /
+
+  # Dashboard 概览
+  dashboard:
+    path: /
+    layout: console
+    auth: true
+    components:
+      - UsageStatsCard
+      - RequestChart
+      - ProviderStatusCard
+      - RecentActivityTable
+
+  # Provider 管理
+  providers:
+    path: /providers
+    layout: console
+    auth: true
+    role: admin
+    components:
+      - ProviderTable
+      - ProviderFormModal
+      - ProviderModelListDrawer
+
+  # 模型列表
+  models:
+    path: /models
+    layout: console
+    auth: true
+    components:
+      - ModelListTable
+      - ModelTestModal
+
+  # API Key 管理
+  api_keys:
+    path: /api-keys
+    layout: console
+    auth: true
+    components:
+      - ApiKeyTable
+      - CreateApiKeyModal
+      - ApiKeyCreatedModal
+
+  # 使用统计
+  usage:
+    path: /usage
+    layout: console
+    auth: true
+    components:
+      - UsageFilterBar
+      - UsageStatsCards
+      - UsageChart
+      - UsageRecordsTable
+
+  # 用户管理
+  users:
+    path: /users
+    layout: console
+    auth: true
+    role: admin
+    components:
+      - UserTable
+      - UserEditModal
+      - UserStatusModal
+
+  # 个人设置
+  settings:
+    path: /settings
+    layout: console
+    auth: true
+    components:
+      - ProfileCard
+      - ChangePasswordForm

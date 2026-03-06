@@ -296,6 +296,10 @@ func (m *MockUserRepositoryForController) UpdateKeyLastUsed(ctx context.Context,
 	return nil
 }
 
+func (m *MockUserRepositoryForController) DeleteAPIKey(ctx context.Context, id int64) error {
+	return nil
+}
+
 // MockJWTServiceForController 用于控制器测试
 type MockJWTServiceForController struct{}
 

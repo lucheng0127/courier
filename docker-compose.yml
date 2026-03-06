@@ -46,5 +46,16 @@ services:
       postgres:
         condition: service_healthy
 
+  # Web 前端服务
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: courier-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - courier
+
 volumes:
   postgres_data:

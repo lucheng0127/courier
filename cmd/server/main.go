@@ -192,10 +192,10 @@ func setupRoutes(router *gin.Engine, providerSvc *service.ProviderService, authS
 	usageCtrl := controller.NewUsageController(usageSvc)
 	usageCtrl.RegisterRoutes(jwtAuth)
 
-	// ========== Chat API（使用 API Key 鉴权） ==========
+	// ========== Chat API（支持 JWT 和 API Key 双重鉴权） ==========
 	v1 := router.Group("/v1")
 	chatCtrl := controller.NewChatController(routerSvc, usageSvc)
 	chatGroup := v1.Group("")
-	chatGroup.Use(middleware.APIKeyAuth(authSvc), middleware.TraceID())
+	chatGroup.Use(middleware.DualAuth(authSvc, jwtSvc), middleware.TraceID())
 	chatCtrl.RegisterRoutes(chatGroup)
 }

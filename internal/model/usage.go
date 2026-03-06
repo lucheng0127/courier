@@ -6,7 +6,7 @@ import "time"
 type UsageRecord struct {
 	ID               int64     `json:"id" db:"id" gorm:"primaryKey"`
 	UserID           int64     `json:"user_id" db:"user_id" gorm:"index"`
-	APIKeyID         int64     `json:"api_key_id" db:"api_key_id" gorm:"index"`
+	APIKeyID         *int64    `json:"api_key_id,omitempty" db:"api_key_id" gorm:"index"`
 	RequestID        string    `json:"request_id" db:"request_id" gorm:"index"`
 	TraceID          string    `json:"trace_id" db:"trace_id" gorm:"index"`
 	Model            string    `json:"model" db:"model" gorm:"index"`
