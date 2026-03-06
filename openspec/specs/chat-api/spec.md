@@ -97,17 +97,19 @@ TBD - created by archiving change add-chat-api. Update Purpose after archive.
 
 系统 SHALL 记录所有 Chat API 请求的日志。
 
-#### Scenario: 日志内容
+#### Scenario: 日志内容（扩展）
 
 - **WHEN** 处理 Chat API 请求时
-- **THEN** 记录请求 ID、API Key（脱敏）、模型名称、Provider、Token 使用量、耗时、状态
+- **THEN** 记录：
+  - 请求 ID、API Key（脱敏）、认证类型
+  - 模型名称、Provider
+  - Token 使用量、耗时、状态
 - **AND** 日志格式为 JSON
+- **AND** 新增 `auth_type` 字段区分认证方式
 
 #### Scenario: 错误日志
 
-- **WHEN** 请求失败时
-- **THEN** 记录错误信息和堆栈
-- **AND** 不记录敏感用户数据
+(无变更，保持原样)
 
 ### Requirement: 流式响应取消
 
