@@ -372,6 +372,7 @@ func (c *ChatController) toStreamChunk(chunk *adapter.ChatStreamChunk, requestID
 func (c *ChatController) logRequestWithRetry(ctx *gin.Context, requestID string, req *model.ChatRequest, modelInfo *service.ModelInfo, result *service.RetryResult, err error, latencyMs int64) {
 	traceID := middleware.GetTraceID(ctx)
 	apiKeyMasked, _ := ctx.Get("api_key_masked")
+	authType, _ := middleware.GetAuthType(ctx)
 
 	// 获取用户信息（从中间件注入）
 	userID, hasUserID := ctx.Get("user_id")
@@ -439,6 +440,7 @@ func (c *ChatController) logRequestWithRetry(ctx *gin.Context, requestID string,
 			zap.Int("fallback_count", log.FallbackCount),
 			zap.String("final_model", log.FinalModelName),
 			zap.Int64("latency_ms", log.LatencyMs),
+			zap.String("auth_type", authType),
 			zap.String("status", log.Status))
 	} else {
 		logger.L.Error("Chat request failed",
@@ -447,14 +449,23 @@ func (c *ChatController) logRequestWithRetry(ctx *gin.Context, requestID string,
 			zap.String("model", log.Model),
 			zap.String("provider", log.ProviderName),
 			zap.Int("attempt_count", len(log.AttemptDetails)),
+			zap.String("auth_type", authType),
 			zap.String("error", log.Error))
 	}
 
 	// 如果有用户信息，记录使用量到数据库
-	if hasUserID && hasAPIKeyID && c.usageService != nil {
+	if hasUserID && c.usageService != nil {
+		// JWT 认证时只有 userID，没有 apiKeyID
+		// API Key 认证时两者都有
+		var apiKeyIDValue *int64
+		if hasAPIKeyID {
+			id := apiKeyID.(int64)
+			apiKeyIDValue = &id
+		}
+
 		record := &model.UsageRecord{
 			UserID:           userID.(int64),
-			APIKeyID:         apiKeyID.(int64),
+			APIKeyID:         apiKeyIDValue,
 			RequestID:        requestID,
 			TraceID:          traceID,
 			Model:            req.Model,
@@ -472,6 +483,7 @@ func (c *ChatController) logRequestWithRetry(ctx *gin.Context, requestID string,
 			logger.L.Error("Failed to record usage",
 				zap.String("request_id", requestID),
 				zap.Any("user_id", userID),
+				zap.String("auth_type", authType),
 				zap.Error(err))
 		}
 	}

@@ -38,7 +38,10 @@ func (c *UserController) RegisterRoutes(r *gin.RouterGroup) {
 		// API Key 管理（普通用户可管理自己的，管理员可管理任何人的）
 		users.POST("/:id/api-keys", c.CreateAPIKey)
 		users.GET("/:id/api-keys", c.ListAPIKeys)
-		users.DELETE("/:id/api-keys/:key_id", c.RevokeAPIKey)
+		users.PATCH("/:id/api-keys/:key_id/enable", c.EnableAPIKey)
+		users.PATCH("/:id/api-keys/:key_id/disable", c.DisableAPIKey)
+		users.DELETE("/:id/api-keys/:key_id", c.DeleteAPIKey)
+		users.DELETE("/:id/api-keys/:key_id/revoke", c.RevokeAPIKey)
 	}
 }
 
@@ -251,6 +254,188 @@ func (c *UserController) RevokeAPIKey(ctx *gin.Context) {
 		}
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"message": "Failed to revoke API key",
+			"type":    "api_error",
+		})
+		return
+	}
+
+	ctx.Status(http.StatusNoContent)
+}
+
+// EnableAPIKey 启用 API Key
+// PATCH /api/v1/users/:id/api-keys/:key_id/enable
+// 权限：管理员可启用任何用户的，普通用户只能启用自己的
+func (c *UserController) EnableAPIKey(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	targetID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"message": "Invalid user ID",
+			"type":    "invalid_request_error",
+		})
+		return
+	}
+
+	// 权限检查：普通用户只能启用自己的 API Key
+	userID, hasAuth := middleware.GetUserID(ctx)
+	userRole, _ := middleware.GetUserRole(ctx)
+	if hasAuth && userRole != "admin" && userID != targetID {
+		ctx.JSON(http.StatusForbidden, gin.H{
+			"message": "Permission denied",
+			"type":    "permission_error",
+		})
+		return
+	}
+
+	keyIDStr := ctx.Param("key_id")
+	keyID, err := strconv.ParseInt(keyIDStr, 10, 64)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"message": "Invalid API key ID",
+			"type":    "invalid_request_error",
+		})
+		return
+	}
+
+	key, err := c.authSvc.EnableAPIKey(ctx, targetID, keyID)
+	if err != nil {
+		if err.Error() == "api key not found" {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"message": "API key not found",
+				"type":    "invalid_request_error",
+			})
+			return
+		}
+		if err.Error() == "api key does not belong to user" {
+			ctx.JSON(http.StatusForbidden, gin.H{
+				"message": "API key does not belong to user",
+				"type":    "permission_error",
+			})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Failed to enable API key",
+			"type":    "api_error",
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, key)
+}
+
+// DisableAPIKey 禁用 API Key
+// PATCH /api/v1/users/:id/api-keys/:key_id/disable
+// 权限：管理员可禁用任何用户的，普通用户只能禁用自己的
+func (c *UserController) DisableAPIKey(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	targetID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"message": "Invalid user ID",
+			"type":    "invalid_request_error",
+		})
+		return
+	}
+
+	// 权限检查：普通用户只能禁用自己的 API Key
+	userID, hasAuth := middleware.GetUserID(ctx)
+	userRole, _ := middleware.GetUserRole(ctx)
+	if hasAuth && userRole != "admin" && userID != targetID {
+		ctx.JSON(http.StatusForbidden, gin.H{
+			"message": "Permission denied",
+			"type":    "permission_error",
+		})
+		return
+	}
+
+	keyIDStr := ctx.Param("key_id")
+	keyID, err := strconv.ParseInt(keyIDStr, 10, 64)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"message": "Invalid API key ID",
+			"type":    "invalid_request_error",
+		})
+		return
+	}
+
+	key, err := c.authSvc.DisableAPIKey(ctx, targetID, keyID)
+	if err != nil {
+		if err.Error() == "api key not found" {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"message": "API key not found",
+				"type":    "invalid_request_error",
+			})
+			return
+		}
+		if err.Error() == "api key does not belong to user" {
+			ctx.JSON(http.StatusForbidden, gin.H{
+				"message": "API key does not belong to user",
+				"type":    "permission_error",
+			})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Failed to disable API key",
+			"type":    "api_error",
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, key)
+}
+
+// DeleteAPIKey 删除 API Key（硬删除）
+// DELETE /api/v1/users/:id/api-keys/:key_id
+// 权限：管理员可删除任何用户的，普通用户只能删除自己的
+func (c *UserController) DeleteAPIKey(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	targetID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"message": "Invalid user ID",
+			"type":    "invalid_request_error",
+		})
+		return
+	}
+
+	// 权限检查：普通用户只能删除自己的 API Key
+	userID, hasAuth := middleware.GetUserID(ctx)
+	userRole, _ := middleware.GetUserRole(ctx)
+	if hasAuth && userRole != "admin" && userID != targetID {
+		ctx.JSON(http.StatusForbidden, gin.H{
+			"message": "Permission denied",
+			"type":    "permission_error",
+		})
+		return
+	}
+
+	keyIDStr := ctx.Param("key_id")
+	keyID, err := strconv.ParseInt(keyIDStr, 10, 64)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"message": "Invalid API key ID",
+			"type":    "invalid_request_error",
+		})
+		return
+	}
+
+	if err := c.authSvc.DeleteAPIKey(ctx, targetID, keyID); err != nil {
+		if err.Error() == "api key not found" {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"message": "API key not found",
+				"type":    "invalid_request_error",
+			})
+			return
+		}
+		if err.Error() == "api key does not belong to user" {
+			ctx.JSON(http.StatusForbidden, gin.H{
+				"message": "API key does not belong to user",
+				"type":    "permission_error",
+			})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Failed to delete API key",
 			"type":    "api_error",
 		})
 		return

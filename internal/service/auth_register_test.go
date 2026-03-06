@@ -125,6 +125,10 @@ func (m *MockUserRepository) UpdateKeyLastUsed(ctx context.Context, id int64) er
 	return nil
 }
 
+func (m *MockUserRepository) DeleteAPIKey(ctx context.Context, id int64) error {
+	return nil
+}
+
 // TestAuthService_Register_Success 测试成功注册新用户
 func TestAuthService_Register_Success(t *testing.T) {
 	mockRepo := NewMockUserRepository()

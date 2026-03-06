@@ -187,6 +187,66 @@ func (s *AuthService) RevokeAPIKey(ctx context.Context, userID, keyID int64) err
 	return s.userRepo.UpdateAPIKeyStatus(ctx, keyID, "revoked")
 }
 
+// EnableAPIKey 启用 API Key
+func (s *AuthService) EnableAPIKey(ctx context.Context, userID, keyID int64) (*model.APIKey, error) {
+	// 获取 API Key
+	key, err := s.userRepo.GetAPIKeyByID(ctx, keyID)
+	if err != nil {
+		return nil, fmt.Errorf("api key not found")
+	}
+
+	// 验证属于该用户
+	if key.UserID != userID {
+		return nil, fmt.Errorf("api key does not belong to user")
+	}
+
+	// 更新状态为 active
+	if err := s.userRepo.UpdateAPIKeyStatus(ctx, keyID, "active"); err != nil {
+		return nil, fmt.Errorf("failed to enable api key: %w", err)
+	}
+
+	// 重新获取更新后的 API Key
+	return s.userRepo.GetAPIKeyByID(ctx, keyID)
+}
+
+// DisableAPIKey 禁用 API Key
+func (s *AuthService) DisableAPIKey(ctx context.Context, userID, keyID int64) (*model.APIKey, error) {
+	// 获取 API Key
+	key, err := s.userRepo.GetAPIKeyByID(ctx, keyID)
+	if err != nil {
+		return nil, fmt.Errorf("api key not found")
+	}
+
+	// 验证属于该用户
+	if key.UserID != userID {
+		return nil, fmt.Errorf("api key does not belong to user")
+	}
+
+	// 更新状态为 disabled
+	if err := s.userRepo.UpdateAPIKeyStatus(ctx, keyID, "disabled"); err != nil {
+		return nil, fmt.Errorf("failed to disable api key: %w", err)
+	}
+
+	// 重新获取更新后的 API Key
+	return s.userRepo.GetAPIKeyByID(ctx, keyID)
+}
+
+// DeleteAPIKey 删除 API Key（硬删除）
+func (s *AuthService) DeleteAPIKey(ctx context.Context, userID, keyID int64) error {
+	// 获取 API Key
+	key, err := s.userRepo.GetAPIKeyByID(ctx, keyID)
+	if err != nil {
+		return fmt.Errorf("api key not found")
+	}
+
+	// 验证属于该用户
+	if key.UserID != userID {
+		return fmt.Errorf("api key does not belong to user")
+	}
+
+	return s.userRepo.DeleteAPIKey(ctx, keyID)
+}
+
 // UpdateKeyLastUsed 更新 API Key 最后使用时间（异步）
 func (s *AuthService) UpdateKeyLastUsed(ctx context.Context, keyID int64) {
 	// 使用独立的 context，避免请求取消影响更新

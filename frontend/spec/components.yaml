@@ -1,0 +1,373 @@
+components:
+  # ========== 表单组件 ==========
+
+  LoginForm:
+    type: form
+    api: POST /api/v1/auth/login
+    fields:
+      - name: email
+        type: email
+        required: true
+        label: 邮箱
+      - name: password
+        type: password
+        required: true
+        label: 密码
+    response:
+      access_token: string
+      refresh_token: string
+      token_type: string
+      expires_in: number
+
+  RegisterForm:
+    type: form
+    api: POST /api/v1/auth/register
+    fields:
+      - name: name
+        type: text
+        required: true
+        label: 姓名
+      - name: email
+        type: email
+        required: true
+        label: 邮箱
+      - name: password
+        type: password
+        required: true
+        label: 密码
+        validation: min_length(8)
+      - name: confirmPassword
+        type: password
+        required: true
+        label: 确认密码
+        validation: match(password)
+    response:
+      id: number
+      name: string
+      email: string
+      role: string
+      status: string
+      created_at: string
+
+  ProviderForm:
+    type: form
+    api:
+      create: POST /api/v1/providers
+      update: PUT /api/v1/providers/:name
+    fields:
+      - name: name
+        type: text
+        required: true
+        label: Provider 名称
+      - name: type
+        type: select
+        required: true
+        label: 类型
+        options:
+          - openai
+          - azure
+          - anthropic
+          - zhipu
+          - qwen
+          - custom
+      - name: base_url
+        type: text
+        required: true
+        label: Base URL
+        placeholder: https://api.openai.com/v1
+      - name: timeout
+        type: number
+        required: true
+        label: 超时时间（秒）
+        default: 60
+      - name: api_key
+        type: password
+        required: false
+        label: API Key
+      - name: enabled
+        type: switch
+        required: true
+        label: 启用
+        default: true
+      - name: fallback_models
+        type: tags
+        required: true
+        label: Fallback 模型
+      - name: extra_config
+        type: json
+        required: false
+        label: 额外配置
+    response:
+      id: number
+      name: string
+      type: string
+      base_url: string
+      timeout: number
+      enabled: boolean
+      fallback_models: string[]
+      created_at: string
+
+  CreateApiKeyForm:
+    type: form
+    api: POST /api/v1/users/:id/api-keys
+    fields:
+      - name: name
+        type: text
+        required: true
+        label: API Key 名称
+    response:
+      id: number
+      key: string
+      key_prefix: string
+      name: string
+      status: string
+      created_at: string
+
+  ChangePasswordForm:
+    type: form
+    api: PUT /api/v1/users/:id
+    fields:
+      - name: currentPassword
+        type: password
+        required: true
+        label: 当前密码
+      - name: newPassword
+        type: password
+        required: true
+        label: 新密码
+        validation: min_length(8)
+      - name: confirmPassword
+        type: password
+        required: true
+        label: 确认新密码
+        validation: match(newPassword)
+
+  UserEditForm:
+    type: form
+    api: PUT /api/v1/users/:id
+    fields:
+      - name: name
+        type: text
+        required: true
+        label: 姓名
+      - name: role
+        type: select
+        required: true
+        label: 角色
+        options:
+          - admin
+          - user
+    response:
+      id: number
+      name: string
+      email: string
+      role: string
+      status: string
+      updated_at: string
+
+  # ========== 表格组件 ==========
+
+  ProviderTable:
+    type: table
+    api: GET /api/v1/providers
+    columns:
+      - name: name
+        label: Provider 名称
+        width: 180px
+      - name: type
+        label: 类型
+        width: 120px
+      - name: base_url
+        label: Base URL
+        width: 200px
+      - name: enabled
+        label: 状态
+        width: 100px
+        component: StatusBadge
+      - name: is_running
+        label: 运行状态
+        width: 100px
+        component: StatusBadge
+      - name: fallback_models
+        label: Fallback 模型
+        width: 200px
+        component: TagsList
+      - name: created_at
+        label: 创建时间
+        width: 180px
+        format: datetime
+      - name: actions
+        label: 操作
+        width: 150px
+        actions:
+          - edit
+          - reload
+          - toggle_status
+          - delete
+    data:
+      providers:
+        provider: Provider
+        is_running: boolean
+
+  ApiKeyTable:
+    type: table
+    api: GET /api/v1/users/:id/api-keys
+    columns:
+      - name: key_prefix
+        label: Key
+        width: 150px
+      - name: name
+        label: 名称
+        width: 200px
+      - name: status
+        label: 状态
+        width: 100px
+        component: StatusBadge
+      - name: created_at
+        label: 创建时间
+        width: 180px
+        format: datetime
+      - name: last_used_at
+        label: 最后使用
+        width: 180px
+        format: datetime
+      - name: actions
+        label: 操作
+        width: 100px
+        actions:
+          - copy
+          - delete
+
+  ModelListTable:
+    type: table
+    api:
+      - GET /api/v1/providers
+      - GET /api/v1/providers/:name/models
+    columns:
+      - name: provider_name
+        label: Provider
+        width: 150px
+      - name: model
+        label: 模型名称
+        width: 200px
+      - name: full_name
+        label: 完整标识
+        width: 250px
+      - name: enabled
+        label: 状态
+        width: 100px
+        component: StatusBadge
+      - name: actions
+        label: 操作
+        width: 100px
+        actions:
+          - test
+
+  UsageRecordsTable:
+    type: table
+    api: GET /api/v1/usage
+    columns:
+      - name: timestamp
+        label: 时间
+        width: 180px
+        format: datetime
+      - name: provider_name
+        label: Provider
+        width: 150px
+      - name: model
+        label: 模型
+        width: 200px
+      - name: prompt_tokens
+        label: Prompt Tokens
+        width: 120px
+        format: number
+      - name: completion_tokens
+        label: Completion Tokens
+        width: 140px
+        format: number
+      - name: total_tokens
+        label: Total Tokens
+        width: 120px
+        format: number
+      - name: latency_ms
+        label: 延迟
+        width: 100px
+        format: duration
+      - name: status
+        label: 状态
+        width: 100px
+        component: StatusBadge
+
+  UserTable:
+    type: table
+    api: GET /api/v1/users
+    columns:
+      - name: id
+        label: ID
+        width: 80px
+      - name: name
+        label: 姓名
+        width: 150px
+      - name: email
+        label: 邮箱
+        width: 200px
+      - name: role
+        label: 角色
+        width: 100px
+      - name: status
+        label: 状态
+        width: 100px
+        component: StatusBadge
+      - name: created_at
+        label: 创建时间
+        width: 180px
+        format: datetime
+      - name: actions
+        label: 操作
+        width: 150px
+        actions:
+          - edit
+          - toggle_status
+          - delete
+          - view_api_keys
+
+  # ========== 数据展示组件 ==========
+
+  UsageStatsCard:
+    type: card
+    api: GET /api/v1/usage
+    data_source: aggregate
+    metrics:
+      - name: total_requests
+        label: 总请求数
+        format: number
+      - name: total_tokens
+        label: 总 Token 数
+        format: number
+      - name: success_rate
+        label: 成功率
+        format: percentage
+      - name: avg_latency
+        label: 平均延迟
+        format: duration
+
+  RequestChart:
+    type: chart
+    api: GET /api/v1/usage
+    chart_type: line
+    data_source: time_series
+    series:
+      - name: requests
+        label: 请求数
+        color: "#10A37F"
+      - name: tokens
+        label: Token 数
+        color: "#6366F1"
+    filters:
+      - time_range: [7d, 30d]
+
+  ProviderStatusCard:
+    type: card
+    api: GET /api/v1/providers
+    data_source: list
+    display: list_summary
